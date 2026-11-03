@@ -91,4 +91,3 @@ class GSCRow(BaseModel):
 class GSCResponse(BaseModel):
     site_url: str
     rows: list[GSCRow]
-

@@ -65,4 +65,3 @@ class Crawler:
                         queue.append(link)
 
         return pages
-

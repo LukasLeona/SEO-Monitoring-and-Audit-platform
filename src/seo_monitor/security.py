@@ -70,4 +70,3 @@ def same_origin(left: str, right: str) -> bool:
         right_url.hostname,
         right_url.port,
     )
-

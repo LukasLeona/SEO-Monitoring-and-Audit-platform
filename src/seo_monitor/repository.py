@@ -85,4 +85,3 @@ class AuditRepository:
 
     async def list(self, limit: int = 20) -> list[AuditSummary]:
         return await asyncio.to_thread(self._list_sync, limit)
-

@@ -44,4 +44,3 @@ class AuditService:
         )
         await self.repository.save(report)
         return report
-

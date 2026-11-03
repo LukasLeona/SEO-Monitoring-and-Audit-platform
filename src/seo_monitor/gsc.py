@@ -44,9 +44,7 @@ class GSCClient:
                 "rowLimit": query.row_limit,
             }
             response = (
-                service.searchanalytics()
-                .query(siteUrl=query.site_url, body=payload)
-                .execute()
+                service.searchanalytics().query(siteUrl=query.site_url, body=payload).execute()
             )
         except (HttpError, OSError, ValueError, google.auth.exceptions.GoogleAuthError) as exc:
             raise GSCError(f"Search Console request failed: {exc}") from exc
@@ -65,4 +63,3 @@ class GSCClient:
 
     async def query(self, query: GSCQuery) -> GSCResponse:
         return await asyncio.to_thread(self._query_sync, query)
-

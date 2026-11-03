@@ -82,4 +82,3 @@ class HTTPFetcher:
                     raise FetchError(f"request failed: {exc}") from exc
 
         raise FetchError("too many redirects")
-

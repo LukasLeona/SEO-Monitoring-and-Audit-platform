@@ -28,4 +28,3 @@ def calculate_report_score(pages: list[PageAudit]) -> int:
 def summarize_issues(pages: list[PageAudit]) -> dict[Severity, int]:
     counts = Counter(issue.severity for page in pages for issue in page.issues)
     return {severity: counts.get(severity, 0) for severity in Severity}
-

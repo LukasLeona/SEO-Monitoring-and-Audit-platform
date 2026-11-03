@@ -3,7 +3,7 @@ from time import perf_counter
 from playwright.async_api import Browser, Playwright, Route, async_playwright
 
 from seo_monitor.config import Settings
-from seo_monitor.fetcher import FetchError, FetchedPage
+from seo_monitor.fetcher import FetchedPage, FetchError
 from seo_monitor.security import UnsafeURLError, validate_public_url
 
 
@@ -88,4 +88,3 @@ class BrowserFetcher:
             raise FetchError(f"browser request failed: {exc}") from exc
         finally:
             await context.close()
-
