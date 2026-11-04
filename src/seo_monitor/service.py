@@ -24,12 +24,14 @@ class AuditService:
                 pages = await Crawler(fetcher, self.settings).crawl(
                     root_url,
                     max_pages=request.max_pages,
+                    respect_robots=request.respect_robots,
                 )
         else:
             fetcher = HTTPFetcher(self.settings)
             pages = await Crawler(fetcher, self.settings).crawl(
                 root_url,
                 max_pages=request.max_pages,
+                respect_robots=request.respect_robots,
             )
 
         report = AuditReport(

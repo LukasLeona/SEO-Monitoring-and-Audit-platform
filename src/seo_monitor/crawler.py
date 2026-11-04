@@ -6,6 +6,7 @@ from seo_monitor.analyzer import analyze_page
 from seo_monitor.config import Settings
 from seo_monitor.fetcher import FetchedPage
 from seo_monitor.models import AuditIssue, PageAudit, Severity
+from seo_monitor.robots import RobotsPolicy
 from seo_monitor.scoring import score_page
 from seo_monitor.security import normalize_url
 
@@ -19,21 +20,53 @@ class Crawler:
         self.fetcher = fetcher
         self.settings = settings
 
-    async def crawl(self, root_url: str, *, max_pages: int) -> list[PageAudit]:
+    async def crawl(
+        self,
+        root_url: str,
+        *,
+        max_pages: int,
+        respect_robots: bool = True,
+    ) -> list[PageAudit]:
         limit = min(max_pages, self.settings.max_crawl_pages)
         queue: deque[str] = deque([normalize_url(root_url)])
         seen: set[str] = set()
         pages: list[PageAudit] = []
+        robots = await RobotsPolicy.load(root_url, self.settings) if respect_robots else None
+        first_batch = True
 
         while queue and len(seen) < limit:
             batch: list[str] = []
-            while queue and len(batch) < self.settings.crawl_concurrency and len(seen) < limit:
+            concurrency = 1 if robots and robots.crawl_delay else self.settings.crawl_concurrency
+            while queue and len(batch) < concurrency and len(seen) < limit:
                 url = queue.popleft()
                 if url in seen:
                     continue
                 seen.add(url)
+                if robots and not robots.can_fetch(url):
+                    pages.append(
+                        PageAudit(
+                            url=url,
+                            final_url=url,
+                            status_code=0,
+                            score=100,
+                            issues=[
+                                AuditIssue(
+                                    code="robots.disallowed",
+                                    category="crawlability",
+                                    severity=Severity.INFO,
+                                    message="Page is disallowed by robots.txt",
+                                )
+                            ],
+                        )
+                    )
+                    continue
                 batch.append(url)
 
+            if not batch:
+                continue
+            if robots and robots.crawl_delay and not first_batch:
+                await asyncio.sleep(robots.crawl_delay)
+            first_batch = False
             outcomes = await asyncio.gather(
                 *(self.fetcher.fetch(url) for url in batch),
                 return_exceptions=True,
