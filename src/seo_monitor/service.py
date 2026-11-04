@@ -8,6 +8,7 @@ from seo_monitor.fetcher import HTTPFetcher
 from seo_monitor.models import AuditReport, AuditRequest
 from seo_monitor.repository import AuditRepository
 from seo_monitor.scoring import calculate_report_score, summarize_issues
+from seo_monitor.sitewide import apply_sitewide_checks
 
 
 class AuditService:
@@ -36,6 +37,7 @@ class AuditService:
                 use_sitemap=request.use_sitemap,
             )
 
+        pages = apply_sitewide_checks(pages)
         report = AuditReport(
             id=str(uuid4()),
             root_url=root_url,
