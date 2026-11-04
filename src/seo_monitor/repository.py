@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import asyncio
 import sqlite3
 from pathlib import Path
 
-from seo_monitor.models import AuditReport, AuditSummary
+from seo_monitor.models import AuditJob, AuditReport, AuditSummary
 
 
 class AuditRepository:
@@ -30,6 +32,17 @@ class AuditRepository:
                     started_at TEXT NOT NULL,
                     completed_at TEXT NOT NULL,
                     report_json TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS audit_jobs (
+                    id TEXT PRIMARY KEY,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    job_json TEXT NOT NULL
                 )
                 """
             )
@@ -112,3 +125,50 @@ class AuditRepository:
             report.started_at.isoformat(),
             report.id,
         )
+
+    def _save_job_sync(self, job: AuditJob) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO audit_jobs
+                    (id, status, created_at, updated_at, job_json)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    job.id,
+                    job.status,
+                    job.created_at.isoformat(),
+                    job.updated_at.isoformat(),
+                    job.model_dump_json(),
+                ),
+            )
+
+    async def save_job(self, job: AuditJob) -> None:
+        await asyncio.to_thread(self._save_job_sync, job)
+
+    def _get_job_sync(self, job_id: str) -> AuditJob | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT job_json FROM audit_jobs WHERE id = ?",
+                (job_id,),
+            ).fetchone()
+        return AuditJob.model_validate_json(row["job_json"]) if row else None
+
+    async def get_job(self, job_id: str) -> AuditJob | None:
+        return await asyncio.to_thread(self._get_job_sync, job_id)
+
+    def _list_jobs_sync(self, limit: int) -> list[AuditJob]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT job_json
+                FROM audit_jobs
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [AuditJob.model_validate_json(row["job_json"]) for row in rows]
+
+    async def list_jobs(self, limit: int = 20) -> list[AuditJob]:
+        return await asyncio.to_thread(self._list_jobs_sync, limit)

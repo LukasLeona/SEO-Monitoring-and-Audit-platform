@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -6,8 +7,10 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from seo_monitor.comparison import compare_audits
 from seo_monitor.config import Settings, get_settings
 from seo_monitor.gsc import GSCClient, GSCError
+from seo_monitor.jobs import AuditJobService
 from seo_monitor.models import (
     AuditComparison,
+    AuditJob,
     AuditReport,
     AuditRequest,
     AuditSummary,
@@ -21,6 +24,7 @@ from seo_monitor.service import AuditService
 def create_app(settings: Settings | None = None) -> FastAPI:
     app_settings = settings or get_settings()
     repository = AuditRepository(app_settings.database_path)
+    tasks: set[asyncio.Task[None]] = set()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -28,7 +32,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.settings = app_settings
         app.state.repository = repository
         app.state.audit_service = AuditService(app_settings, repository)
+        app.state.audit_job_service = AuditJobService(
+            app.state.audit_service,
+            repository,
+            tasks,
+        )
         yield
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     app = FastAPI(
         title=app_settings.app_name,
@@ -41,6 +52,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     def audit_repository(request: Request) -> AuditRepository:
         return request.app.state.repository
+
+    def audit_job_service(request: Request) -> AuditJobService:
+        return request.app.state.audit_job_service
 
     @app.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
@@ -57,6 +71,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         service: AuditService = Depends(audit_service),
     ) -> AuditReport:
         return await service.run(payload)
+
+    @app.post(
+        "/api/v1/jobs",
+        response_model=AuditJob,
+        status_code=status.HTTP_202_ACCEPTED,
+        tags=["jobs"],
+    )
+    async def create_audit_job(
+        payload: AuditRequest,
+        jobs: AuditJobService = Depends(audit_job_service),
+    ) -> AuditJob:
+        return await jobs.submit(payload)
+
+    @app.get("/api/v1/jobs", response_model=list[AuditJob], tags=["jobs"])
+    async def list_audit_jobs(
+        limit: int = Query(default=20, ge=1, le=100),
+        repo: AuditRepository = Depends(audit_repository),
+    ) -> list[AuditJob]:
+        return await repo.list_jobs(limit)
+
+    @app.get("/api/v1/jobs/{job_id}", response_model=AuditJob, tags=["jobs"])
+    async def get_audit_job(
+        job_id: str,
+        repo: AuditRepository = Depends(audit_repository),
+    ) -> AuditJob:
+        job = await repo.get_job(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Audit job not found")
+        return job
 
     @app.get("/api/v1/audits", response_model=list[AuditSummary], tags=["audits"])
     async def list_audits(
