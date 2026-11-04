@@ -3,9 +3,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 
+from seo_monitor.comparison import compare_audits
 from seo_monitor.config import Settings, get_settings
 from seo_monitor.gsc import GSCClient, GSCError
 from seo_monitor.models import (
+    AuditComparison,
     AuditReport,
     AuditRequest,
     AuditSummary,
@@ -72,6 +74,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if report is None:
             raise HTTPException(status_code=404, detail="Audit not found")
         return report
+
+    @app.get(
+        "/api/v1/audits/{audit_id}/compare",
+        response_model=AuditComparison,
+        tags=["audits"],
+    )
+    async def compare_audit(
+        audit_id: str,
+        baseline_id: str | None = None,
+        repo: AuditRepository = Depends(audit_repository),
+    ) -> AuditComparison:
+        current = await repo.get(audit_id)
+        if current is None:
+            raise HTTPException(status_code=404, detail="Audit not found")
+        baseline = await repo.get(baseline_id) if baseline_id else await repo.previous(current)
+        if baseline is None:
+            raise HTTPException(status_code=404, detail="Baseline audit not found")
+        return compare_audits(baseline, current)
 
     @app.post("/api/v1/gsc/query", response_model=GSCResponse, tags=["search-console"])
     async def query_search_console(payload: GSCQuery) -> GSCResponse:

@@ -85,3 +85,30 @@ class AuditRepository:
 
     async def list(self, limit: int = 20) -> list[AuditSummary]:
         return await asyncio.to_thread(self._list_sync, limit)
+
+    def _previous_sync(
+        self,
+        root_url: str,
+        before_started_at: str,
+        exclude_id: str,
+    ) -> AuditReport | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT report_json
+                FROM audits
+                WHERE root_url = ? AND started_at < ? AND id != ?
+                ORDER BY started_at DESC
+                LIMIT 1
+                """,
+                (root_url, before_started_at, exclude_id),
+            ).fetchone()
+        return AuditReport.model_validate_json(row["report_json"]) if row else None
+
+    async def previous(self, report: AuditReport) -> AuditReport | None:
+        return await asyncio.to_thread(
+            self._previous_sync,
+            report.root_url,
+            report.started_at.isoformat(),
+            report.id,
+        )

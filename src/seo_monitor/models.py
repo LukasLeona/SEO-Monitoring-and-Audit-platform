@@ -75,6 +75,16 @@ class AuditSummary(BaseModel):
     completed_at: datetime
 
 
+class AuditComparison(BaseModel):
+    baseline_id: str
+    current_id: str
+    score_change: int
+    pages_change: int
+    issue_changes: dict[Severity, int]
+    new_issue_codes: list[str]
+    resolved_issue_codes: list[str]
+
+
 class GSCQuery(BaseModel):
     site_url: str = Field(min_length=1)
     start_date: date
