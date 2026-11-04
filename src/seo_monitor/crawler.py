@@ -9,6 +9,7 @@ from seo_monitor.models import AuditIssue, PageAudit, Severity
 from seo_monitor.robots import RobotsPolicy
 from seo_monitor.scoring import score_page
 from seo_monitor.security import normalize_url
+from seo_monitor.sitemap import SitemapLoader
 
 
 class PageFetcher(Protocol):
@@ -26,12 +27,20 @@ class Crawler:
         *,
         max_pages: int,
         respect_robots: bool = True,
+        use_sitemap: bool = False,
     ) -> list[PageAudit]:
         limit = min(max_pages, self.settings.max_crawl_pages)
         queue: deque[str] = deque([normalize_url(root_url)])
         seen: set[str] = set()
         pages: list[PageAudit] = []
         robots = await RobotsPolicy.load(root_url, self.settings) if respect_robots else None
+        if use_sitemap and limit > 1:
+            sitemap_urls = await SitemapLoader(self.settings).discover(
+                root_url,
+                robots.sitemaps if robots else [],
+                max_urls=limit - 1,
+            )
+            queue.extend(sitemap_urls)
         first_batch = True
 
         while queue and len(seen) < limit:

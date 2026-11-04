@@ -25,6 +25,7 @@ class AuditService:
                     root_url,
                     max_pages=request.max_pages,
                     respect_robots=request.respect_robots,
+                    use_sitemap=request.use_sitemap,
                 )
         else:
             fetcher = HTTPFetcher(self.settings)
@@ -32,6 +33,7 @@ class AuditService:
                 root_url,
                 max_pages=request.max_pages,
                 respect_robots=request.respect_robots,
+                use_sitemap=request.use_sitemap,
             )
 
         report = AuditReport(

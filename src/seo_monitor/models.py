@@ -45,6 +45,7 @@ class AuditRequest(BaseModel):
     max_pages: int = Field(default=1, ge=1, le=250)
     use_browser: bool = False
     respect_robots: bool = True
+    use_sitemap: bool = True
 
 
 class AuditReport(BaseModel):
