@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass
 from time import perf_counter
 from urllib.parse import urljoin
@@ -50,35 +51,62 @@ class HTTPFetcher:
             trust_env=False,
         ) as client:
             for _ in range(6):
-                try:
-                    async with client.stream("GET", current_url) as response:
-                        if response.is_redirect:
-                            location = response.headers.get("location")
-                            if not location:
-                                raise FetchError("redirect response did not include a location")
-                            current_url = await validate_public_url(
-                                urljoin(current_url, location),
-                                allow_private_hosts=self.settings.allow_private_hosts,
+                redirected = False
+                for attempt in range(self.settings.max_retries + 1):
+                    try:
+                        async with client.stream("GET", current_url) as response:
+                            retryable = response.status_code in {429, 500, 502, 503, 504}
+                            if retryable and attempt < self.settings.max_retries:
+                                await response.aread()
+                                await self._backoff(attempt, response.headers.get("retry-after"))
+                                continue
+
+                            if response.is_redirect:
+                                location = response.headers.get("location")
+                                if not location:
+                                    raise FetchError("redirect response did not include a location")
+                                current_url = await validate_public_url(
+                                    urljoin(current_url, location),
+                                    allow_private_hosts=self.settings.allow_private_hosts,
+                                )
+                                redirected = True
+                                break
+
+                            body = bytearray()
+                            async for chunk in response.aiter_bytes():
+                                body.extend(chunk)
+                                if len(body) > self.settings.max_response_bytes:
+                                    raise FetchError("response exceeded the configured size limit")
+
+                            encoding = response.encoding or "utf-8"
+                            html = bytes(body).decode(encoding, errors="replace")
+                            return FetchedPage(
+                                requested_url=requested_url,
+                                final_url=str(response.url),
+                                status_code=response.status_code,
+                                headers={
+                                    key.lower(): value for key, value in response.headers.items()
+                                },
+                                html=html,
+                                duration_ms=round((perf_counter() - started) * 1000),
                             )
-                            continue
+                    except httpx.HTTPError as exc:
+                        if attempt >= self.settings.max_retries:
+                            raise FetchError(f"request failed: {exc}") from exc
+                        await self._backoff(attempt)
 
-                        body = bytearray()
-                        async for chunk in response.aiter_bytes():
-                            body.extend(chunk)
-                            if len(body) > self.settings.max_response_bytes:
-                                raise FetchError("response exceeded the configured size limit")
-
-                        encoding = response.encoding or "utf-8"
-                        html = bytes(body).decode(encoding, errors="replace")
-                        return FetchedPage(
-                            requested_url=requested_url,
-                            final_url=str(response.url),
-                            status_code=response.status_code,
-                            headers={key.lower(): value for key, value in response.headers.items()},
-                            html=html,
-                            duration_ms=round((perf_counter() - started) * 1000),
-                        )
-                except httpx.HTTPError as exc:
-                    raise FetchError(f"request failed: {exc}") from exc
+                if redirected:
+                    continue
+                raise FetchError("request failed after retries")
 
         raise FetchError("too many redirects")
+
+    async def _backoff(self, attempt: int, retry_after: str | None = None) -> None:
+        delay = self.settings.retry_backoff_seconds * (2**attempt)
+        if retry_after:
+            try:
+                delay = min(float(retry_after), 30.0)
+            except ValueError:
+                pass
+        if delay:
+            await asyncio.sleep(delay)

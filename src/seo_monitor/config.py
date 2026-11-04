@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     database_path: str = "seo_monitor.db"
     request_timeout_seconds: float = Field(default=20.0, gt=0, le=120)
     max_response_bytes: int = Field(default=5_000_000, gt=0)
+    max_retries: int = Field(default=2, ge=0, le=5)
+    retry_backoff_seconds: float = Field(default=0.25, ge=0, le=10)
     user_agent: str = (
         "SEOMonitorBot/0.1 (+https://github.com/LukasLeona/SEO-Monitoring-and-Audit-platform)"
     )
