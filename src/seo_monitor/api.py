@@ -22,12 +22,14 @@ from seo_monitor.models import (
     MonitorCreate,
 )
 from seo_monitor.monitoring import MonitoringService
+from seo_monitor.observability import add_request_tracing, configure_logging
 from seo_monitor.repository import AuditRepository
 from seo_monitor.service import AuditService
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     app_settings = settings or get_settings()
+    configure_logging(app_settings.log_level)
     repository = AuditRepository(app_settings.database_path)
     tasks: set[asyncio.Task[None]] = set()
 
@@ -62,6 +64,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
+    add_request_tracing(app)
 
     def audit_service(request: Request) -> AuditService:
         return request.app.state.audit_service
