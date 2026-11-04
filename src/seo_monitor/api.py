@@ -3,9 +3,11 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi.responses import Response
 
 from seo_monitor.comparison import compare_audits
 from seo_monitor.config import Settings, get_settings
+from seo_monitor.exporter import audit_to_csv
 from seo_monitor.gsc import GSCClient, GSCError
 from seo_monitor.jobs import AuditJobService
 from seo_monitor.models import (
@@ -135,6 +137,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if baseline is None:
             raise HTTPException(status_code=404, detail="Baseline audit not found")
         return compare_audits(baseline, current)
+
+    @app.get(
+        "/api/v1/audits/{audit_id}/export.csv",
+        response_class=Response,
+        tags=["audits"],
+    )
+    async def export_audit(
+        audit_id: str,
+        repo: AuditRepository = Depends(audit_repository),
+    ) -> Response:
+        report = await repo.get(audit_id)
+        if report is None:
+            raise HTTPException(status_code=404, detail="Audit not found")
+        return Response(
+            content=audit_to_csv(report),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="seo-audit-{report.id}.csv"'},
+        )
 
     @app.post("/api/v1/gsc/query", response_model=GSCResponse, tags=["search-console"])
     async def query_search_console(payload: GSCQuery) -> GSCResponse:
