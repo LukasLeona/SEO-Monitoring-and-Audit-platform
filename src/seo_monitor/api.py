@@ -18,7 +18,10 @@ from seo_monitor.models import (
     AuditSummary,
     GSCQuery,
     GSCResponse,
+    Monitor,
+    MonitorCreate,
 )
+from seo_monitor.monitoring import MonitoringService
 from seo_monitor.repository import AuditRepository
 from seo_monitor.service import AuditService
 
@@ -39,7 +42,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             repository,
             tasks,
         )
+        app.state.monitoring_service = MonitoringService(
+            app_settings,
+            repository,
+            app.state.audit_job_service,
+        )
+        scheduler = asyncio.create_task(
+            app.state.monitoring_service.scheduler(),
+            name="monitor-scheduler",
+        )
         yield
+        scheduler.cancel()
+        await asyncio.gather(scheduler, return_exceptions=True)
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -57,6 +71,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     def audit_job_service(request: Request) -> AuditJobService:
         return request.app.state.audit_job_service
+
+    def monitoring_service(request: Request) -> MonitoringService:
+        return request.app.state.monitoring_service
 
     @app.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
@@ -102,6 +119,39 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if job is None:
             raise HTTPException(status_code=404, detail="Audit job not found")
         return job
+
+    @app.post(
+        "/api/v1/monitors",
+        response_model=Monitor,
+        status_code=status.HTTP_201_CREATED,
+        tags=["monitors"],
+    )
+    async def create_monitor(
+        payload: MonitorCreate,
+        monitors: MonitoringService = Depends(monitoring_service),
+    ) -> Monitor:
+        return await monitors.create(payload)
+
+    @app.get("/api/v1/monitors", response_model=list[Monitor], tags=["monitors"])
+    async def list_monitors(
+        repo: AuditRepository = Depends(audit_repository),
+    ) -> list[Monitor]:
+        return await repo.list_monitors()
+
+    @app.patch(
+        "/api/v1/monitors/{monitor_id}",
+        response_model=Monitor,
+        tags=["monitors"],
+    )
+    async def update_monitor(
+        monitor_id: str,
+        enabled: bool,
+        monitors: MonitoringService = Depends(monitoring_service),
+    ) -> Monitor:
+        monitor = await monitors.set_enabled(monitor_id, enabled)
+        if monitor is None:
+            raise HTTPException(status_code=404, detail="Monitor not found")
+        return monitor
 
     @app.get("/api/v1/audits", response_model=list[AuditSummary], tags=["audits"])
     async def list_audits(

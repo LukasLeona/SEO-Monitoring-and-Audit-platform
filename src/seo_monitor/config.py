@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     )
     max_crawl_pages: int = Field(default=25, ge=1, le=250)
     crawl_concurrency: int = Field(default=5, ge=1, le=20)
+    monitor_poll_seconds: int = Field(default=60, ge=5, le=3600)
     allow_private_hosts: bool = False
     gsc_credentials_file: str | None = None
 

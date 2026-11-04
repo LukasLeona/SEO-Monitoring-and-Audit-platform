@@ -72,6 +72,24 @@ class AuditJob(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class MonitorCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    request: AuditRequest
+    interval_minutes: int = Field(default=1440, ge=15, le=43_200)
+    run_immediately: bool = True
+
+
+class Monitor(BaseModel):
+    id: str
+    name: str
+    request: AuditRequest
+    interval_minutes: int
+    enabled: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    next_run_at: datetime
+    last_job_id: str | None = None
+
+
 class AuditReport(BaseModel):
     id: str
     root_url: str

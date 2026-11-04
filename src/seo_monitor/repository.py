@@ -4,7 +4,7 @@ import asyncio
 import sqlite3
 from pathlib import Path
 
-from seo_monitor.models import AuditJob, AuditReport, AuditSummary
+from seo_monitor.models import AuditJob, AuditReport, AuditSummary, Monitor
 
 
 class AuditRepository:
@@ -32,6 +32,16 @@ class AuditRepository:
                     started_at TEXT NOT NULL,
                     completed_at TEXT NOT NULL,
                     report_json TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS monitors (
+                    id TEXT PRIMARY KEY,
+                    enabled INTEGER NOT NULL,
+                    next_run_at TEXT NOT NULL,
+                    monitor_json TEXT NOT NULL
                 )
                 """
             )
@@ -172,3 +182,59 @@ class AuditRepository:
 
     async def list_jobs(self, limit: int = 20) -> list[AuditJob]:
         return await asyncio.to_thread(self._list_jobs_sync, limit)
+
+    def _save_monitor_sync(self, monitor: Monitor) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO monitors
+                    (id, enabled, next_run_at, monitor_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    monitor.id,
+                    int(monitor.enabled),
+                    monitor.next_run_at.isoformat(),
+                    monitor.model_dump_json(),
+                ),
+            )
+
+    async def save_monitor(self, monitor: Monitor) -> None:
+        await asyncio.to_thread(self._save_monitor_sync, monitor)
+
+    def _get_monitor_sync(self, monitor_id: str) -> Monitor | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT monitor_json FROM monitors WHERE id = ?",
+                (monitor_id,),
+            ).fetchone()
+        return Monitor.model_validate_json(row["monitor_json"]) if row else None
+
+    async def get_monitor(self, monitor_id: str) -> Monitor | None:
+        return await asyncio.to_thread(self._get_monitor_sync, monitor_id)
+
+    def _list_monitors_sync(self) -> list[Monitor]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT monitor_json FROM monitors ORDER BY next_run_at"
+            ).fetchall()
+        return [Monitor.model_validate_json(row["monitor_json"]) for row in rows]
+
+    async def list_monitors(self) -> list[Monitor]:
+        return await asyncio.to_thread(self._list_monitors_sync)
+
+    def _due_monitors_sync(self, now: str) -> list[Monitor]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT monitor_json
+                FROM monitors
+                WHERE enabled = 1 AND next_run_at <= ?
+                ORDER BY next_run_at
+                """,
+                (now,),
+            ).fetchall()
+        return [Monitor.model_validate_json(row["monitor_json"]) for row in rows]
+
+    async def due_monitors(self, now: str) -> list[Monitor]:
+        return await asyncio.to_thread(self._due_monitors_sync, now)
