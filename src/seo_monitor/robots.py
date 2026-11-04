@@ -37,9 +37,10 @@ class RobotsPolicy:
 
         lines = response.html.splitlines()
         parser.parse(lines)
+        sitemap_lines = [line.strip() for line in lines]
         sitemaps = [
             line.split(":", 1)[1].strip()
-            for line in lines
+            for line in sitemap_lines
             if line.lower().startswith("sitemap:") and line.split(":", 1)[1].strip()
         ]
         delay = parser.crawl_delay(user_agent) or parser.crawl_delay("*")

@@ -1,6 +1,8 @@
 from collections import deque
+from urllib.parse import urlsplit, urlunsplit
 
 from defusedxml import ElementTree
+from defusedxml.common import DefusedXmlException
 
 from seo_monitor.config import Settings
 from seo_monitor.fetcher import FetchError, HTTPFetcher
@@ -23,7 +25,11 @@ class SitemapLoader:
         max_urls: int,
         max_documents: int = 10,
     ) -> list[str]:
-        candidates = declared_sitemaps or [normalize_url(root_url).rstrip("/") + "/sitemap.xml"]
+        parsed_root = urlsplit(normalize_url(root_url))
+        default_sitemap = urlunsplit(
+            (parsed_root.scheme, parsed_root.netloc, "/sitemap.xml", "", "")
+        )
+        candidates = declared_sitemaps or [default_sitemap]
         queue: deque[str] = deque(candidates)
         visited: set[str] = set()
         urls: list[str] = []
@@ -39,7 +45,12 @@ class SitemapLoader:
                 if response.status_code >= 400:
                     continue
                 root = ElementTree.fromstring(response.html)
-            except (FetchError, ElementTree.ParseError, ValueError):
+            except (
+                DefusedXmlException,
+                ElementTree.ParseError,
+                FetchError,
+                ValueError,
+            ):
                 continue
 
             locations = [
