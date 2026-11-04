@@ -45,6 +45,7 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
     description = _text(description_tag.get("content")) if description_tag else None
     h1 = [_text(tag.get_text(" ", strip=True)) for tag in soup.find_all("h1")]
     h1 = [value for value in h1 if value]
+    headings = [tag.name for tag in soup.find_all(re.compile(r"^h[1-6]$"))]
 
     canonical_tag = soup.find("link", attrs={"rel": lambda rel: rel and "canonical" in rel})
     canonical = None
@@ -161,6 +162,43 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
             )
         )
 
+    viewport = soup.find("meta", attrs={"name": re.compile(r"^viewport$", re.I)})
+    if not viewport:
+        issues.append(
+            _issue(
+                "mobile.viewport_missing",
+                "mobile",
+                Severity.WARNING,
+                "Page has no viewport meta tag",
+            )
+        )
+
+    open_graph = soup.find("meta", attrs={"property": re.compile(r"^og:", re.I)})
+    if not open_graph:
+        issues.append(
+            _issue(
+                "social.open_graph_missing",
+                "social",
+                Severity.INFO,
+                "Page has no Open Graph metadata",
+            )
+        )
+
+    twitter_card = soup.find("meta", attrs={"name": re.compile(r"^twitter:card$", re.I)})
+    if not twitter_card:
+        issues.append(
+            _issue(
+                "social.twitter_card_missing",
+                "social",
+                Severity.INFO,
+                "Page has no Twitter card metadata",
+            )
+        )
+
+    hreflang_tags = soup.find_all(
+        "link", attrs={"rel": lambda rel: rel and "alternate" in rel, "hreflang": True}
+    )
+
     images = soup.find_all("img")
     images_without_alt = sum(1 for image in images if image.get("alt") is None)
     if images_without_alt:
@@ -171,20 +209,6 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
                 Severity.WARNING,
                 "Some images have no alt attribute",
                 count=images_without_alt,
-            )
-        )
-
-    for node in soup(["script", "style", "noscript", "template"]):
-        node.decompose()
-    word_count = len(re.findall(r"\b[\w'-]+\b", soup.get_text(" ", strip=True)))
-    if word_count < 200 and page.status_code < 400:
-        issues.append(
-            _issue(
-                "content.thin",
-                "content",
-                Severity.WARNING,
-                "Page contains fewer than 200 words",
-                words=word_count,
             )
         )
 
@@ -201,9 +225,16 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
         else:
             external_links += 1
 
+    structured_data_types: list[str] = []
     for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
         try:
-            json.loads(script.string or "")
+            data = json.loads(script.string or "")
+            entries = data if isinstance(data, list) else [data]
+            for entry in entries:
+                if isinstance(entry, dict) and entry.get("@type"):
+                    value = entry["@type"]
+                    types = value if isinstance(value, list) else [value]
+                    structured_data_types.extend(str(item) for item in types)
         except (json.JSONDecodeError, TypeError):
             issues.append(
                 _issue(
@@ -214,6 +245,20 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
                 )
             )
 
+    for node in soup(["script", "style", "noscript", "template"]):
+        node.decompose()
+    word_count = len(re.findall(r"\b[\w'-]+\b", soup.get_text(" ", strip=True)))
+    if word_count < 200 and page.status_code < 400:
+        issues.append(
+            _issue(
+                "content.thin",
+                "content",
+                Severity.WARNING,
+                "Page contains fewer than 200 words",
+                words=word_count,
+            )
+        )
+
     audit = PageAudit(
         url=page.requested_url,
         final_url=page.final_url,
@@ -222,7 +267,14 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
         title=title,
         meta_description=description,
         h1=h1,
+        headings=headings,
         canonical=canonical,
+        meta_robots=robots_content or None,
+        has_viewport=viewport is not None,
+        has_open_graph=open_graph is not None,
+        has_twitter_card=twitter_card is not None,
+        hreflang_count=len(hreflang_tags),
+        structured_data_types=list(dict.fromkeys(structured_data_types)),
         word_count=word_count,
         internal_links=internal_links,
         external_links=external_links,

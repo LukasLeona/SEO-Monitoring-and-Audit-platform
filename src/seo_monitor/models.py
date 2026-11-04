@@ -28,7 +28,14 @@ class PageAudit(BaseModel):
     title: str | None = None
     meta_description: str | None = None
     h1: list[str] = Field(default_factory=list)
+    headings: list[str] = Field(default_factory=list)
     canonical: str | None = None
+    meta_robots: str | None = None
+    has_viewport: bool = False
+    has_open_graph: bool = False
+    has_twitter_card: bool = False
+    hreflang_count: int = 0
+    structured_data_types: list[str] = Field(default_factory=list)
     word_count: int = 0
     internal_links: int = 0
     external_links: int = 0
