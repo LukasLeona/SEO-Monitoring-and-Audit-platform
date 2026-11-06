@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.responses import Response
 
+from seo_monitor.api_security import configure_api_security
 from seo_monitor.comparison import compare_audits
 from seo_monitor.config import Settings, get_settings
 from seo_monitor.exporter import audit_to_csv
@@ -64,6 +65,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
+    configure_api_security(app, app_settings)
     add_request_tracing(app)
 
     def audit_service(request: Request) -> AuditService:
