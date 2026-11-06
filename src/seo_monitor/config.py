@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     api_key: SecretStr | None = None
     cors_origins: str = ""
+    webhook_url: str | None = None
+    webhook_secret: SecretStr | None = None
+    webhook_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
     database_path: str = "seo_monitor.db"
     request_timeout_seconds: float = Field(default=20.0, gt=0, le=120)
     max_response_bytes: int = Field(default=5_000_000, gt=0)

@@ -26,6 +26,7 @@ from seo_monitor.monitoring import MonitoringService
 from seo_monitor.observability import add_request_tracing, configure_logging
 from seo_monitor.repository import AuditRepository
 from seo_monitor.service import AuditService
+from seo_monitor.webhook import WebhookNotifier
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -44,6 +45,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.audit_service,
             repository,
             tasks,
+            WebhookNotifier(app_settings),
         )
         app.state.monitoring_service = MonitoringService(
             app_settings,

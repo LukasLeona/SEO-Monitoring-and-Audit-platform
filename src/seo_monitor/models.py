@@ -107,6 +107,7 @@ class AuditJob(BaseModel):
     request: AuditRequest
     audit_id: str | None = None
     error: str | None = None
+    notification_error: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
