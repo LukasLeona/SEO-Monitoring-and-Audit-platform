@@ -4,6 +4,38 @@ from typing import Any
 
 from pydantic import BaseModel, Field, HttpUrl, model_validator
 
+ISSUE_REMEDIATIONS: dict[str, str] = {
+    "http.server_error": (
+        "Inspect application and upstream logs, then restore a stable 2xx response."
+    ),
+    "http.client_error": (
+        "Fix the URL, redirect it to a relevant page, or restore the missing resource."
+    ),
+    "content.non_html": "Serve indexable pages with an HTML content type.",
+    "title.missing": "Add a unique, descriptive title element to the page head.",
+    "title.short": "Expand the title with specific topic or intent terms without adding filler.",
+    "title.long": "Shorten the title so its most useful terms are likely to remain visible.",
+    "description.missing": "Add a unique meta description that summarizes the page benefit.",
+    "description.length": (
+        "Rewrite the meta description to communicate the page clearly and concisely."
+    ),
+    "h1.missing": "Add one clear H1 that describes the primary page topic.",
+    "h1.multiple": "Keep one primary H1 and move subsections to lower heading levels.",
+    "canonical.missing": "Add a self-referencing or intentionally selected canonical URL.",
+    "html.lang_missing": "Set the html lang attribute to the page's primary language.",
+    "robots.noindex": "Remove noindex when the page should be eligible for search results.",
+    "mobile.viewport_missing": "Add a responsive viewport meta tag for mobile rendering.",
+    "social.open_graph_missing": "Add Open Graph title, description, image, and URL metadata.",
+    "social.twitter_card_missing": "Add a Twitter card type and supporting social metadata.",
+    "image.alt_missing": "Add meaningful alt text, or an empty alt value for decorative images.",
+    "content.thin": "Add original, useful content that fully answers the page's search intent.",
+    "structured_data.invalid_json": "Validate and correct the JSON-LD syntax before deployment.",
+    "robots.disallowed": "Review the robots.txt rule if this page should be crawlable.",
+    "fetch.failed": "Check DNS, TLS, timeouts, and server availability for the failed URL.",
+    "sitewide.duplicate_title": "Give every indexable page a distinct, intent-specific title.",
+    "sitewide.duplicate_description": "Write a distinct description for each indexable page.",
+}
+
 
 class Severity(StrEnum):
     CRITICAL = "critical"
@@ -18,6 +50,13 @@ class AuditIssue(BaseModel):
     severity: Severity
     message: str
     evidence: dict[str, Any] = Field(default_factory=dict)
+    remediation: str | None = None
+
+    @model_validator(mode="after")
+    def add_default_remediation(self) -> "AuditIssue":
+        if self.remediation is None:
+            self.remediation = ISSUE_REMEDIATIONS.get(self.code)
+        return self
 
 
 class PageAudit(BaseModel):
