@@ -160,6 +160,32 @@ class AuditComparison(BaseModel):
     resolved_issue_codes: list[str]
 
 
+class InsightIssue(BaseModel):
+    code: str
+    category: str
+    severity: Severity
+    occurrences: int
+    affected_pages: list[str]
+    remediation: str | None = None
+
+
+class SlowPage(BaseModel):
+    url: str
+    duration_ms: int
+    status_code: int
+
+
+class AuditInsights(BaseModel):
+    audit_id: str
+    score: int
+    grade: str
+    total_issues: int
+    indexable_pages: int
+    category_totals: dict[str, int]
+    top_issues: list[InsightIssue]
+    slowest_pages: list[SlowPage]
+
+
 class GSCQuery(BaseModel):
     site_url: str = Field(min_length=1)
     start_date: date

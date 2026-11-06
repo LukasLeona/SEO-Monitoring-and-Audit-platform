@@ -10,9 +10,11 @@ from seo_monitor.comparison import compare_audits
 from seo_monitor.config import Settings, get_settings
 from seo_monitor.exporter import audit_to_csv
 from seo_monitor.gsc import GSCClient, GSCError
+from seo_monitor.insights import build_insights
 from seo_monitor.jobs import AuditJobService
 from seo_monitor.models import (
     AuditComparison,
+    AuditInsights,
     AuditJob,
     AuditReport,
     AuditRequest,
@@ -194,6 +196,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if baseline is None:
             raise HTTPException(status_code=404, detail="Baseline audit not found")
         return compare_audits(baseline, current)
+
+    @app.get(
+        "/api/v1/audits/{audit_id}/insights",
+        response_model=AuditInsights,
+        tags=["audits"],
+    )
+    async def audit_insights(
+        audit_id: str,
+        repo: AuditRepository = Depends(audit_repository),
+    ) -> AuditInsights:
+        report = await repo.get(audit_id)
+        if report is None:
+            raise HTTPException(status_code=404, detail="Audit not found")
+        return build_insights(report)
 
     @app.get(
         "/api/v1/audits/{audit_id}/export.csv",
