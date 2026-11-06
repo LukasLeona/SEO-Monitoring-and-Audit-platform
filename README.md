@@ -18,6 +18,9 @@ history, renders JavaScript when needed, and queries Google Search Console.
 - SQLite audit history
 - historical comparisons, background jobs, recurring monitors, and CSV exports
 - JSON request logs with request IDs and processing-time headers
+- optional API-key authentication, CORS allowlists, and hardened response headers
+- actionable remediation guidance and prioritized audit insights
+- signed completion webhooks for background and scheduled audits
 - CLI, Docker image, tests, linting, and GitHub Actions
 
 ## Quick start
@@ -54,6 +57,8 @@ curl -X POST http://127.0.0.1:8000/api/v1/monitors \
 Compare an audit with the previous audit for the same root URL through
 `GET /api/v1/audits/{audit_id}/compare`, or supply `baseline_id` explicitly.
 Download page-level results from `GET /api/v1/audits/{audit_id}/export.csv`.
+Use `GET /api/v1/audits/{audit_id}/insights` for the prioritized issue list,
+affected URLs, audit grade, indexable-page count, and slowest pages.
 
 For JavaScript-rendered audits, install Chromium once and set
 `use_browser` to `true`:
@@ -90,6 +95,17 @@ Transient 429 and 5xx responses are retried with bounded exponential backoff.
 Every response includes `X-Request-ID` and `X-Process-Time-Ms`; logs use
 newline-delimited JSON for straightforward ingestion.
 
+Set `SEO_API_KEY` to require that value in the `X-API-Key` header for every
+`/api/v1` route. The interactive OpenAPI UI automatically exposes the API-key
+authorization control when protection is enabled. Configure
+`SEO_CORS_ORIGINS` as a comma-separated allowlist when a browser dashboard
+calls the API from another origin.
+
+Set `SEO_WEBHOOK_URL` to receive `audit.completed` events from background and
+scheduled audits. When `SEO_WEBHOOK_SECRET` is present, the raw JSON body is
+signed with HMAC-SHA256 in the `X-SEO-Signature` header. Webhook destinations
+pass the same public-address checks as crawl targets.
+
 ## Development
 
 ```bash
@@ -102,7 +118,8 @@ Audit reports are stored in `seo_monitor.db` by default. Credentials, local
 databases, virtual environments, and environment files are ignored by Git.
 
 See [Architecture](docs/architecture.md) for the component flow and operational
-constraints.
+constraints, and [API guide](docs/api.md) for the main endpoint workflows.
+
 
 
 

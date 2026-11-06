@@ -1,4 +1,6 @@
 import secrets
+from collections.abc import Callable
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
@@ -17,6 +19,27 @@ def configure_api_security(app: FastAPI, settings: Settings) -> None:
             allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
             allow_headers=["Content-Type", "X-API-Key", "X-Request-ID"],
         )
+
+    if settings.api_key:
+        original_openapi: Callable[[], dict[str, Any]] = app.openapi
+
+        def secured_openapi() -> dict[str, Any]:
+            schema = original_openapi()
+            schemes = schema.setdefault("components", {}).setdefault("securitySchemes", {})
+            schemes["ApiKeyAuth"] = {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-API-Key",
+            }
+            for path, operations in schema.get("paths", {}).items():
+                if not path.startswith("/api/v1"):
+                    continue
+                for operation in operations.values():
+                    if isinstance(operation, dict):
+                        operation["security"] = [{"ApiKeyAuth": []}]
+            return schema
+
+        app.openapi = secured_openapi
 
     @app.middleware("http")
     async def security_headers_and_auth(request: Request, call_next):

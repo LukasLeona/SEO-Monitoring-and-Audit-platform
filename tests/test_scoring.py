@@ -9,3 +9,14 @@ def test_score_uses_severity_weights_and_never_goes_below_zero() -> None:
     ]
 
     assert calculate_page_score(issues) == 0
+
+
+def test_known_issue_includes_remediation() -> None:
+    issue = AuditIssue(
+        code="title.missing",
+        category="metadata",
+        severity=Severity.ERROR,
+        message="Page has no title",
+    )
+
+    assert issue.remediation

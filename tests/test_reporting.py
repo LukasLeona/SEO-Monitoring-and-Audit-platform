@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 from seo_monitor.comparison import compare_audits
 from seo_monitor.exporter import audit_to_csv
+from seo_monitor.insights import build_insights
 from seo_monitor.models import AuditIssue, AuditReport, PageAudit, Severity
 from seo_monitor.sitewide import apply_sitewide_checks
 
@@ -77,9 +78,13 @@ def test_comparison_and_csv_export() -> None:
     current = report("after", 99, [current_page])
 
     comparison = compare_audits(baseline, current)
+    insights = build_insights(current)
     rows = list(csv.DictReader(io.StringIO(audit_to_csv(current))))
 
     assert comparison.score_change == 4
     assert comparison.new_issue_codes == ["new.issue"]
     assert comparison.resolved_issue_codes == ["old.issue"]
+    assert insights.grade == "A"
+    assert insights.total_issues == 1
+    assert insights.top_issues[0].code == "new.issue"
     assert rows[0]["issue_codes"] == "new.issue"
