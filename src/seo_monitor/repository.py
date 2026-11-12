@@ -4,7 +4,14 @@ import asyncio
 import sqlite3
 from pathlib import Path
 
-from seo_monitor.models import AuditJob, AuditJobStatus, AuditReport, AuditSummary, Monitor
+from seo_monitor.models import (
+    AuditJob,
+    AuditJobStatus,
+    AuditReport,
+    AuditSummary,
+    Monitor,
+    SystemStats,
+)
 
 SCHEMA_VERSION = 1
 
@@ -87,6 +94,47 @@ class AuditRepository:
 
     async def initialize(self) -> None:
         await asyncio.to_thread(self._initialize_sync)
+
+    def _healthcheck_sync(self) -> int:
+        with self._connect() as connection:
+            connection.execute("SELECT 1").fetchone()
+            row = connection.execute(
+                "SELECT MAX(version) AS version FROM schema_migrations"
+            ).fetchone()
+        return int(row["version"] or 0)
+
+    async def healthcheck(self) -> int:
+        return await asyncio.to_thread(self._healthcheck_sync)
+
+    def _stats_sync(self) -> SystemStats:
+        with self._connect() as connection:
+            audits_total = connection.execute("SELECT COUNT(*) AS count FROM audits").fetchone()[
+                "count"
+            ]
+            job_rows = connection.execute(
+                "SELECT status, COUNT(*) AS count FROM audit_jobs GROUP BY status"
+            ).fetchall()
+            monitor_row = connection.execute(
+                """
+                SELECT
+                    COUNT(*) AS total,
+                    COALESCE(SUM(enabled), 0) AS enabled
+                FROM monitors
+                """
+            ).fetchone()
+            version = connection.execute(
+                "SELECT MAX(version) AS version FROM schema_migrations"
+            ).fetchone()["version"]
+        return SystemStats(
+            schema_version=version or 0,
+            audits_total=audits_total,
+            jobs_by_status={row["status"]: row["count"] for row in job_rows},
+            monitors_total=monitor_row["total"],
+            monitors_enabled=monitor_row["enabled"],
+        )
+
+    async def stats(self) -> SystemStats:
+        return await asyncio.to_thread(self._stats_sync)
 
     def _save_sync(self, report: AuditReport) -> None:
         with self._connect() as connection:

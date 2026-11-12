@@ -218,6 +218,14 @@ class AuditInsights(BaseModel):
     slowest_pages: list[SlowPage]
 
 
+class SystemStats(BaseModel):
+    schema_version: int
+    audits_total: int
+    jobs_by_status: dict[str, int]
+    monitors_total: int
+    monitors_enabled: int
+
+
 class GSCFilter(BaseModel):
     dimension: Literal["query", "page", "country", "device", "searchAppearance"]
     operator: Literal[

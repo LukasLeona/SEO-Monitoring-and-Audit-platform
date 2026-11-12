@@ -12,6 +12,7 @@ from seo_monitor.exporter import audit_to_csv
 from seo_monitor.gsc import GSCClient, GSCError
 from seo_monitor.insights import build_insights
 from seo_monitor.jobs import AuditJobService
+from seo_monitor.metrics import render_metrics
 from seo_monitor.models import (
     AuditComparison,
     AuditInsights,
@@ -25,6 +26,7 @@ from seo_monitor.models import (
     Monitor,
     MonitorCreate,
     MonitorUpdate,
+    SystemStats,
 )
 from seo_monitor.monitoring import MonitoringService
 from seo_monitor.observability import add_request_tracing, configure_logging
@@ -89,6 +91,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
         return {"status": "ok", "environment": app_settings.app_env}
+
+    @app.get("/health/ready", tags=["system"])
+    async def readiness(
+        repo: AuditRepository = Depends(audit_repository),
+    ) -> dict[str, int | str]:
+        version = await repo.healthcheck()
+        return {"status": "ready", "schema_version": version}
+
+    @app.get(
+        "/api/v1/system/stats",
+        response_model=SystemStats,
+        tags=["system"],
+    )
+    async def system_stats(
+        repo: AuditRepository = Depends(audit_repository),
+    ) -> SystemStats:
+        return await repo.stats()
+
+    @app.get(
+        "/api/v1/system/metrics",
+        response_class=Response,
+        tags=["system"],
+    )
+    async def system_metrics(
+        repo: AuditRepository = Depends(audit_repository),
+    ) -> Response:
+        return Response(
+            render_metrics(await repo.stats()),
+            media_type="text/plain; version=0.0.4",
+        )
 
     @app.post(
         "/api/v1/audits",
