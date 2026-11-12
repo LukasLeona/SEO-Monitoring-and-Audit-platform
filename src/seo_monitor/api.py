@@ -16,6 +16,7 @@ from seo_monitor.models import (
     AuditComparison,
     AuditInsights,
     AuditJob,
+    AuditJobStatus,
     AuditReport,
     AuditRequest,
     AuditSummary,
@@ -115,9 +116,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/v1/jobs", response_model=list[AuditJob], tags=["jobs"])
     async def list_audit_jobs(
         limit: int = Query(default=20, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+        job_status: AuditJobStatus | None = Query(default=None, alias="status"),
         repo: AuditRepository = Depends(audit_repository),
     ) -> list[AuditJob]:
-        return await repo.list_jobs(limit)
+        return await repo.list_jobs(limit, offset, job_status)
 
     @app.get("/api/v1/jobs/{job_id}", response_model=AuditJob, tags=["jobs"])
     async def get_audit_job(

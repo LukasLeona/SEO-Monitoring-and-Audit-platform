@@ -4,7 +4,7 @@ import asyncio
 import sqlite3
 from pathlib import Path
 
-from seo_monitor.models import AuditJob, AuditReport, AuditSummary, Monitor
+from seo_monitor.models import AuditJob, AuditJobStatus, AuditReport, AuditSummary, Monitor
 
 SCHEMA_VERSION = 1
 
@@ -230,21 +230,40 @@ class AuditRepository:
     async def get_job(self, job_id: str) -> AuditJob | None:
         return await asyncio.to_thread(self._get_job_sync, job_id)
 
-    def _list_jobs_sync(self, limit: int) -> list[AuditJob]:
+    def _list_jobs_sync(
+        self,
+        limit: int,
+        offset: int,
+        status: AuditJobStatus | None,
+    ) -> list[AuditJob]:
+        where = "WHERE status = ?" if status else ""
+        parameters: list[object] = [status] if status else []
+        parameters.extend([limit, offset])
         with self._connect() as connection:
             rows = connection.execute(
-                """
+                f"""
                 SELECT job_json
                 FROM audit_jobs
+                {where}
                 ORDER BY created_at DESC
-                LIMIT ?
+                LIMIT ? OFFSET ?
                 """,
-                (limit,),
+                parameters,
             ).fetchall()
         return [AuditJob.model_validate_json(row["job_json"]) for row in rows]
 
-    async def list_jobs(self, limit: int = 20) -> list[AuditJob]:
-        return await asyncio.to_thread(self._list_jobs_sync, limit)
+    async def list_jobs(
+        self,
+        limit: int = 20,
+        offset: int = 0,
+        status: AuditJobStatus | None = None,
+    ) -> list[AuditJob]:
+        return await asyncio.to_thread(
+            self._list_jobs_sync,
+            limit,
+            offset,
+            status,
+        )
 
     def _save_monitor_sync(self, monitor: Monitor) -> None:
         with self._connect() as connection:
