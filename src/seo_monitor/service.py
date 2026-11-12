@@ -25,6 +25,9 @@ class AuditService:
                 pages = await Crawler(fetcher, self.settings).crawl(
                     root_url,
                     max_pages=request.max_pages,
+                    max_depth=request.max_depth,
+                    include_paths=request.include_paths,
+                    exclude_paths=request.exclude_paths,
                     respect_robots=request.respect_robots,
                     use_sitemap=request.use_sitemap,
                 )
@@ -33,6 +36,9 @@ class AuditService:
             pages = await Crawler(fetcher, self.settings).crawl(
                 root_url,
                 max_pages=request.max_pages,
+                max_depth=request.max_depth,
+                include_paths=request.include_paths,
+                exclude_paths=request.exclude_paths,
                 respect_robots=request.respect_robots,
                 use_sitemap=request.use_sitemap,
             )

@@ -89,6 +89,9 @@ class PageAudit(BaseModel):
 class AuditRequest(BaseModel):
     url: HttpUrl
     max_pages: int = Field(default=1, ge=1, le=250)
+    max_depth: int = Field(default=5, ge=0, le=20)
+    include_paths: list[str] = Field(default_factory=list, max_length=20)
+    exclude_paths: list[str] = Field(default_factory=list, max_length=20)
     use_browser: bool = False
     respect_robots: bool = True
     use_sitemap: bool = True
