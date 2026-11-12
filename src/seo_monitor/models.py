@@ -23,6 +23,11 @@ ISSUE_REMEDIATIONS: dict[str, str] = {
     "h1.multiple": "Keep one primary H1 and move subsections to lower heading levels.",
     "heading.skipped_level": "Use sequential heading levels so the document outline is clear.",
     "canonical.missing": "Add a self-referencing or intentionally selected canonical URL.",
+    "canonical.multiple": "Keep exactly one canonical link in the document head.",
+    "canonical.insecure": "Point HTTPS pages to an HTTPS canonical URL.",
+    "hreflang.invalid": "Give every hreflang entry a valid language code and absolute target.",
+    "hreflang.duplicate": "Keep only one alternate URL for each hreflang value.",
+    "hreflang.x_default_missing": "Add an x-default alternate for unmatched languages.",
     "html.lang_missing": "Set the html lang attribute to the page's primary language.",
     "robots.noindex": "Remove noindex when the page should be eligible for search results.",
     "mobile.viewport_missing": "Add a responsive viewport meta tag for mobile rendering.",
@@ -78,6 +83,7 @@ class PageAudit(BaseModel):
     has_open_graph: bool = False
     has_twitter_card: bool = False
     hreflang_count: int = 0
+    hreflang_values: list[str] = Field(default_factory=list)
     structured_data_types: list[str] = Field(default_factory=list)
     word_count: int = 0
     internal_links: int = 0

@@ -48,10 +48,21 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
     headings = [tag.name for tag in soup.find_all(re.compile(r"^h[1-6]$"))]
     heading_levels = [int(heading[1]) for heading in headings]
 
-    canonical_tag = soup.find("link", attrs={"rel": lambda rel: rel and "canonical" in rel})
+    canonical_tags = soup.find_all("link", attrs={"rel": lambda rel: rel and "canonical" in rel})
+    canonical_tag = canonical_tags[0] if canonical_tags else None
     canonical = None
     if canonical_tag and canonical_tag.get("href"):
         canonical = resolve_link(page.final_url, str(canonical_tag["href"]))
+    if len(canonical_tags) > 1:
+        issues.append(
+            _issue(
+                "canonical.multiple",
+                "indexability",
+                Severity.ERROR,
+                "Page declares more than one canonical URL",
+                count=len(canonical_tags),
+            )
+        )
 
     if page.status_code >= 500:
         issues.append(
@@ -156,6 +167,16 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
         issues.append(
             _issue("canonical.missing", "indexability", Severity.INFO, "Page has no canonical link")
         )
+    elif page.final_url.startswith("https://") and canonical.startswith("http://"):
+        issues.append(
+            _issue(
+                "canonical.insecure",
+                "indexability",
+                Severity.WARNING,
+                "HTTPS page points to an HTTP canonical URL",
+                canonical=canonical,
+            )
+        )
 
     html_tag = soup.find("html")
     if not html_tag or not html_tag.get("lang"):
@@ -213,6 +234,45 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
     hreflang_tags = soup.find_all(
         "link", attrs={"rel": lambda rel: rel and "alternate" in rel, "hreflang": True}
     )
+    hreflang_values: list[str] = []
+    invalid_hreflang = 0
+    for tag in hreflang_tags:
+        value = str(tag.get("hreflang", "")).strip().lower()
+        target = resolve_link(page.final_url, str(tag.get("href", "")))
+        if not value or not target:
+            invalid_hreflang += 1
+            continue
+        hreflang_values.append(value)
+    if invalid_hreflang:
+        issues.append(
+            _issue(
+                "hreflang.invalid",
+                "international",
+                Severity.WARNING,
+                "Some hreflang entries are incomplete or invalid",
+                count=invalid_hreflang,
+            )
+        )
+    duplicates = sorted(value for value in set(hreflang_values) if hreflang_values.count(value) > 1)
+    if duplicates:
+        issues.append(
+            _issue(
+                "hreflang.duplicate",
+                "international",
+                Severity.WARNING,
+                "Page declares duplicate hreflang values",
+                values=duplicates,
+            )
+        )
+    if hreflang_values and "x-default" not in hreflang_values:
+        issues.append(
+            _issue(
+                "hreflang.x_default_missing",
+                "international",
+                Severity.INFO,
+                "Hreflang set does not include x-default",
+            )
+        )
 
     images = soup.find_all("img")
     images_without_alt = sum(1 for image in images if image.get("alt") is None)
@@ -311,6 +371,7 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
         has_open_graph=open_graph is not None,
         has_twitter_card=twitter_card is not None,
         hreflang_count=len(hreflang_tags),
+        hreflang_values=list(dict.fromkeys(hreflang_values)),
         structured_data_types=list(dict.fromkeys(structured_data_types)),
         word_count=word_count,
         internal_links=internal_links,
