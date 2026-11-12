@@ -24,6 +24,7 @@ from seo_monitor.models import (
     GSCResponse,
     Monitor,
     MonitorCreate,
+    MonitorUpdate,
 )
 from seo_monitor.monitoring import MonitoringService
 from seo_monitor.observability import add_request_tracing, configure_logging
@@ -171,13 +172,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     async def update_monitor(
         monitor_id: str,
-        enabled: bool,
+        payload: MonitorUpdate,
         monitors: MonitoringService = Depends(monitoring_service),
     ) -> Monitor:
-        monitor = await monitors.set_enabled(monitor_id, enabled)
+        monitor = await monitors.update(monitor_id, payload)
         if monitor is None:
             raise HTTPException(status_code=404, detail="Monitor not found")
         return monitor
+
+    @app.post(
+        "/api/v1/monitors/{monitor_id}/run",
+        response_model=AuditJob,
+        status_code=status.HTTP_202_ACCEPTED,
+        tags=["monitors"],
+    )
+    async def run_monitor_now(
+        monitor_id: str,
+        monitors: MonitoringService = Depends(monitoring_service),
+    ) -> AuditJob:
+        result = await monitors.run_now(monitor_id)
+        if result is None:
+            raise HTTPException(status_code=404, detail="Monitor not found")
+        _, job = result
+        return job
 
     @app.get("/api/v1/audits", response_model=list[AuditSummary], tags=["audits"])
     async def list_audits(

@@ -138,6 +138,19 @@ class MonitorCreate(BaseModel):
     run_immediately: bool = True
 
 
+class MonitorUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    request: AuditRequest | None = None
+    interval_minutes: int | None = Field(default=None, ge=15, le=43_200)
+    enabled: bool | None = None
+
+    @model_validator(mode="after")
+    def require_change(self) -> "MonitorUpdate":
+        if not self.model_fields_set:
+            raise ValueError("at least one monitor field must be provided")
+        return self
+
+
 class Monitor(BaseModel):
     id: str
     name: str
