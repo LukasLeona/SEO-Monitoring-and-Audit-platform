@@ -165,9 +165,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/v1/audits", response_model=list[AuditSummary], tags=["audits"])
     async def list_audits(
         limit: int = Query(default=20, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+        root_url: str | None = None,
+        min_score: int | None = Query(default=None, ge=0, le=100),
+        max_score: int | None = Query(default=None, ge=0, le=100),
         repo: AuditRepository = Depends(audit_repository),
     ) -> list[AuditSummary]:
-        return await repo.list(limit)
+        if min_score is not None and max_score is not None and min_score > max_score:
+            raise HTTPException(
+                status_code=422,
+                detail="min_score must be less than or equal to max_score",
+            )
+        return await repo.list(
+            limit,
+            offset,
+            root_url,
+            min_score,
+            max_score,
+        )
 
     @app.get("/api/v1/audits/{audit_id}", response_model=AuditReport, tags=["audits"])
     async def get_audit(

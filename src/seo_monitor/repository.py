@@ -121,21 +121,56 @@ class AuditRepository:
     async def get(self, audit_id: str) -> AuditReport | None:
         return await asyncio.to_thread(self._get_sync, audit_id)
 
-    def _list_sync(self, limit: int) -> list[AuditSummary]:
+    def _list_sync(
+        self,
+        limit: int,
+        offset: int,
+        root_url: str | None,
+        min_score: int | None,
+        max_score: int | None,
+    ) -> list[AuditSummary]:
+        conditions: list[str] = []
+        parameters: list[object] = []
+        if root_url:
+            conditions.append("root_url = ?")
+            parameters.append(root_url)
+        if min_score is not None:
+            conditions.append("score >= ?")
+            parameters.append(min_score)
+        if max_score is not None:
+            conditions.append("score <= ?")
+            parameters.append(max_score)
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        parameters.extend([limit, offset])
         with self._connect() as connection:
             rows = connection.execute(
-                """
+                f"""
                 SELECT id, root_url, score, pages_scanned, started_at, completed_at
                 FROM audits
+                {where}
                 ORDER BY started_at DESC
-                LIMIT ?
+                LIMIT ? OFFSET ?
                 """,
-                (limit,),
+                parameters,
             ).fetchall()
         return [AuditSummary.model_validate(dict(row)) for row in rows]
 
-    async def list(self, limit: int = 20) -> list[AuditSummary]:
-        return await asyncio.to_thread(self._list_sync, limit)
+    async def list(
+        self,
+        limit: int = 20,
+        offset: int = 0,
+        root_url: str | None = None,
+        min_score: int | None = None,
+        max_score: int | None = None,
+    ) -> list[AuditSummary]:
+        return await asyncio.to_thread(
+            self._list_sync,
+            limit,
+            offset,
+            root_url,
+            min_score,
+            max_score,
+        )
 
     def _previous_sync(
         self,
