@@ -63,6 +63,8 @@ class PageAudit(BaseModel):
     url: str
     final_url: str
     status_code: int
+    crawl_depth: int = 0
+    discovered_from: str | None = None
     content_type: str | None = None
     title: str | None = None
     meta_description: str | None = None

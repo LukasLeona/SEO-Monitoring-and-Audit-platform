@@ -36,7 +36,7 @@ class Crawler:
     ) -> list[PageAudit]:
         limit = min(max_pages, self.settings.max_crawl_pages)
         normalized_root = normalize_url(root_url)
-        queue: deque[tuple[str, int]] = deque([(normalized_root, 0)])
+        queue: deque[tuple[str, int, str | None]] = deque([(normalized_root, 0, None)])
         seen: set[str] = set()
         pages: list[PageAudit] = []
         robots = await RobotsPolicy.load(root_url, self.settings) if respect_robots else None
@@ -46,14 +46,14 @@ class Crawler:
                 robots.sitemaps if robots else [],
                 max_urls=limit - 1,
             )
-            queue.extend((url, 1) for url in sitemap_urls)
+            queue.extend((url, 1, "sitemap") for url in sitemap_urls)
         first_batch = True
 
         while queue and len(seen) < limit:
-            batch: list[tuple[str, int]] = []
+            batch: list[tuple[str, int, str | None]] = []
             concurrency = 1 if robots and robots.crawl_delay else self.settings.crawl_concurrency
             while queue and len(batch) < concurrency and len(seen) < limit:
-                url, depth = queue.popleft()
+                url, depth, discovered_from = queue.popleft()
                 if url in seen:
                     continue
                 if depth > max_depth or (
@@ -68,6 +68,8 @@ class Crawler:
                             url=url,
                             final_url=url,
                             status_code=0,
+                            crawl_depth=depth,
+                            discovered_from=discovered_from,
                             score=100,
                             issues=[
                                 AuditIssue(
@@ -80,7 +82,7 @@ class Crawler:
                         )
                     )
                     continue
-                batch.append((url, depth))
+                batch.append((url, depth, discovered_from))
 
             if not batch:
                 continue
@@ -88,15 +90,17 @@ class Crawler:
                 await asyncio.sleep(robots.crawl_delay)
             first_batch = False
             outcomes = await asyncio.gather(
-                *(self.fetcher.fetch(url) for url, _ in batch),
+                *(self.fetcher.fetch(url) for url, _, _ in batch),
                 return_exceptions=True,
             )
-            for (url, depth), outcome in zip(batch, outcomes, strict=True):
+            for (url, depth, discovered_from), outcome in zip(batch, outcomes, strict=True):
                 if isinstance(outcome, BaseException):
                     failed = PageAudit(
                         url=url,
                         final_url=url,
                         status_code=0,
+                        crawl_depth=depth,
+                        discovered_from=discovered_from,
                         score=0,
                         issues=[
                             AuditIssue(
@@ -112,10 +116,16 @@ class Crawler:
                     continue
 
                 analysis = analyze_page(outcome)
-                pages.append(score_page(analysis.audit))
+                audit = analysis.audit.model_copy(
+                    update={
+                        "crawl_depth": depth,
+                        "discovered_from": discovered_from,
+                    }
+                )
+                pages.append(score_page(audit))
                 for link in analysis.discovered_links:
                     if link not in seen:
-                        queue.append((link, depth + 1))
+                        queue.append((link, depth + 1, url))
 
         return pages
 
