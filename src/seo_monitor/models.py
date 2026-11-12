@@ -41,6 +41,9 @@ ISSUE_REMEDIATIONS: dict[str, str] = {
     "fetch.failed": "Check DNS, TLS, timeouts, and server availability for the failed URL.",
     "sitewide.duplicate_title": "Give every indexable page a distinct, intent-specific title.",
     "sitewide.duplicate_description": "Write a distinct description for each indexable page.",
+    "sitewide.duplicate_content": (
+        "Consolidate substantially identical pages or make each page uniquely useful."
+    ),
 }
 
 
@@ -86,6 +89,7 @@ class PageAudit(BaseModel):
     hreflang_values: list[str] = Field(default_factory=list)
     structured_data_types: list[str] = Field(default_factory=list)
     word_count: int = 0
+    content_hash: str | None = None
     internal_links: int = 0
     external_links: int = 0
     empty_links: int = 0

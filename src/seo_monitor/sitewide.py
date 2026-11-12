@@ -47,4 +47,10 @@ def apply_sitewide_checks(pages: list[PageAudit]) -> list[PageAudit]:
         code="sitewide.duplicate_description",
         message="Multiple pages use the same meta description",
     )
+    _flag_duplicates(
+        pages,
+        value_for=lambda page: page.content_hash if page.word_count >= 50 else None,
+        code="sitewide.duplicate_content",
+        message="Multiple pages contain substantially identical visible content",
+    )
     return [score_page(page) for page in pages]

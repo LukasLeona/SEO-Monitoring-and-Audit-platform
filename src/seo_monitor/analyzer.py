@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 from dataclasses import dataclass
@@ -344,7 +345,11 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
 
     for node in soup(["script", "style", "noscript", "template"]):
         node.decompose()
-    word_count = len(re.findall(r"\b[\w'-]+\b", soup.get_text(" ", strip=True)))
+    visible_text = " ".join(soup.get_text(" ", strip=True).split())
+    word_count = len(re.findall(r"\b[\w'-]+\b", visible_text))
+    content_hash = (
+        hashlib.sha256(visible_text.casefold().encode()).hexdigest() if visible_text else None
+    )
     if word_count < 200 and page.status_code < 400:
         issues.append(
             _issue(
@@ -374,6 +379,7 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
         hreflang_values=list(dict.fromkeys(hreflang_values)),
         structured_data_types=list(dict.fromkeys(structured_data_types)),
         word_count=word_count,
+        content_hash=content_hash,
         internal_links=internal_links,
         external_links=external_links,
         empty_links=empty_links,
