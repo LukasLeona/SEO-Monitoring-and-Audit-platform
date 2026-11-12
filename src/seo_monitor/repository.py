@@ -6,14 +6,18 @@ from pathlib import Path
 
 from seo_monitor.models import AuditJob, AuditReport, AuditSummary, Monitor
 
+SCHEMA_VERSION = 1
+
 
 class AuditRepository:
     def __init__(self, database_path: str) -> None:
         self.database_path = database_path
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.database_path)
+        connection = sqlite3.connect(self.database_path, timeout=5)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute("PRAGMA busy_timeout=5000")
         return connection
 
     def _initialize_sync(self) -> None:
@@ -22,6 +26,15 @@ class AuditRepository:
             path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute("PRAGMA synchronous=NORMAL")
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    version INTEGER PRIMARY KEY,
+                    applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS audits (
@@ -37,6 +50,17 @@ class AuditRepository:
             )
             connection.execute(
                 """
+                CREATE TABLE IF NOT EXISTS audit_jobs (
+                    id TEXT PRIMARY KEY,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    job_json TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
                 CREATE TABLE IF NOT EXISTS monitors (
                     id TEXT PRIMARY KEY,
                     enabled INTEGER NOT NULL,
@@ -46,15 +70,19 @@ class AuditRepository:
                 """
             )
             connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS audit_jobs (
-                    id TEXT PRIMARY KEY,
-                    status TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    job_json TEXT NOT NULL
-                )
-                """
+                "CREATE INDEX IF NOT EXISTS idx_audits_root_started "
+                "ON audits(root_url, started_at DESC)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_jobs_status_created "
+                "ON audit_jobs(status, created_at DESC)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_monitors_due ON monitors(enabled, next_run_at)"
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO schema_migrations(version) VALUES (?)",
+                (SCHEMA_VERSION,),
             )
 
     async def initialize(self) -> None:
