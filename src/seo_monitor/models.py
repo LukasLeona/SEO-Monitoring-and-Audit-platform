@@ -1,6 +1,6 @@
 from datetime import UTC, date, datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, HttpUrl, model_validator
 
@@ -218,12 +218,30 @@ class AuditInsights(BaseModel):
     slowest_pages: list[SlowPage]
 
 
+class GSCFilter(BaseModel):
+    dimension: Literal["query", "page", "country", "device", "searchAppearance"]
+    operator: Literal[
+        "contains",
+        "equals",
+        "notContains",
+        "notEquals",
+        "includingRegex",
+        "excludingRegex",
+    ] = "equals"
+    expression: str = Field(min_length=1, max_length=4096)
+
+
 class GSCQuery(BaseModel):
     site_url: str = Field(min_length=1)
     start_date: date
     end_date: date
     dimensions: list[str] = Field(default_factory=lambda: ["date"])
+    filters: list[GSCFilter] = Field(default_factory=list, max_length=20)
+    search_type: Literal["web", "image", "video", "news", "discover", "googleNews"] = "web"
+    aggregation_type: Literal["auto", "byPage", "byProperty"] = "auto"
+    data_state: Literal["final", "all", "hourly_all"] = "final"
     row_limit: int = Field(default=1000, ge=1, le=25_000)
+    start_row: int = Field(default=0, ge=0)
 
     @model_validator(mode="after")
     def validate_date_range(self) -> "GSCQuery":
@@ -243,3 +261,4 @@ class GSCRow(BaseModel):
 class GSCResponse(BaseModel):
     site_url: str
     rows: list[GSCRow]
+    response_aggregation_type: str | None = None

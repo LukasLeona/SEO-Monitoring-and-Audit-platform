@@ -41,8 +41,19 @@ class GSCClient:
                 "startDate": query.start_date.isoformat(),
                 "endDate": query.end_date.isoformat(),
                 "dimensions": query.dimensions,
+                "type": query.search_type,
+                "aggregationType": query.aggregation_type,
+                "dataState": query.data_state,
                 "rowLimit": query.row_limit,
+                "startRow": query.start_row,
             }
+            if query.filters:
+                payload["dimensionFilterGroups"] = [
+                    {
+                        "groupType": "and",
+                        "filters": [item.model_dump() for item in query.filters],
+                    }
+                ]
             response = (
                 service.searchanalytics().query(siteUrl=query.site_url, body=payload).execute()
             )
@@ -59,7 +70,11 @@ class GSCClient:
             )
             for row in response.get("rows", [])
         ]
-        return GSCResponse(site_url=query.site_url, rows=rows)
+        return GSCResponse(
+            site_url=query.site_url,
+            rows=rows,
+            response_aggregation_type=response.get("responseAggregationType"),
+        )
 
     async def query(self, query: GSCQuery) -> GSCResponse:
         return await asyncio.to_thread(self._query_sync, query)
