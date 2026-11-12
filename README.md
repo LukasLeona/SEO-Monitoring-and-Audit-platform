@@ -6,17 +6,18 @@ history, renders JavaScript when needed, and queries Google Search Console.
 ## Features
 
 - FastAPI endpoints with generated OpenAPI documentation
-- bounded same-origin crawling with redirect and response-size limits
+- bounded same-origin crawling with depth, path, redirect, and response-size limits
 - SSRF protection for private, loopback, link-local, and reserved addresses
 - Beautiful Soup checks for metadata, headings, canonicals, indexability,
   image alt text, mobile/social tags, thin content, and JSON-LD
 - robots.txt enforcement, crawl-delay support, and XML sitemap discovery
-- sitewide duplicate title and description detection
+- sitewide duplicate title, description, and visible-content detection
 - weighted page and site scores
 - optional Playwright rendering for JavaScript-heavy sites
-- Google Search Console Search Analytics queries
+- advanced Google Search Console queries with filters and pagination
 - SQLite audit history
-- historical comparisons, background jobs, recurring monitors, and CSV exports
+- searchable history, cancellable jobs, editable monitors, and CSV exports
+- readiness checks and Prometheus-compatible operational metrics
 - JSON request logs with request IDs and processing-time headers
 - optional API-key authentication, CORS allowlists, and hardened response headers
 - actionable remediation guidance and prioritized audit insights
@@ -39,7 +40,7 @@ Run a one-page audit:
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/audits \
   -H "Content-Type: application/json" \
-  -d '{"url":"https://example.com","max_pages":10,"use_browser":false,"respect_robots":true,"use_sitemap":true}'
+  -d '{"url":"https://example.com","max_pages":10,"max_depth":3,"exclude_paths":["/account/*"],"use_browser":false,"respect_robots":true,"use_sitemap":true}'
 ```
 
 For longer audits, submit the same payload to `POST /api/v1/jobs` and poll
@@ -70,7 +71,10 @@ uv run playwright install chromium
 The CLI can run the same audit without starting a server:
 
 ```bash
-uv run seo-monitor audit https://example.com --max-pages 5
+uv run seo-monitor audit https://example.com --max-pages 20 --max-depth 3 \
+  --include-path "/blog/*" --exclude-path "/blog/drafts/*"
+uv run seo-monitor history --limit 10
+uv run seo-monitor stats
 ```
 
 ## Google Search Console
@@ -82,7 +86,7 @@ path. Application Default Credentials are used when that setting is absent.
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/gsc/query \
   -H "Content-Type: application/json" \
-  -d '{"site_url":"https://example.com/","start_date":"2026-10-01","end_date":"2026-10-31","dimensions":["date"],"row_limit":1000}'
+  -d '{"site_url":"https://example.com/","start_date":"2026-10-01","end_date":"2026-10-31","dimensions":["date"],"search_type":"web","data_state":"final","filters":[{"dimension":"query","operator":"contains","expression":"seo"}],"row_limit":1000}'
 ```
 
 ## Configuration
@@ -116,6 +120,8 @@ uv run pytest
 
 Audit reports are stored in `seo_monitor.db` by default. Credentials, local
 databases, virtual environments, and environment files are ignored by Git.
+Use `/health/ready` for readiness probes and `/api/v1/system/metrics` for
+Prometheus-compatible counters.
 
 See [Architecture](docs/architecture.md) for the component flow and operational
 constraints, and [API guide](docs/api.md) for the main endpoint workflows.

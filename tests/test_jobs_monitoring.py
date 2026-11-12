@@ -9,6 +9,7 @@ from seo_monitor.models import (
     AuditReport,
     AuditRequest,
     MonitorCreate,
+    MonitorUpdate,
     Severity,
 )
 from seo_monitor.monitoring import MonitoringService
@@ -66,3 +67,36 @@ async def test_due_monitor_submits_job_and_advances_schedule(tmp_path) -> None:
     assert saved is not None
     assert saved.last_job_id == "job-1"
     assert saved.next_run_at > monitor.next_run_at
+
+    updated = await service.update(
+        monitor.id,
+        MonitorUpdate(name="Updated daily", interval_minutes=60),
+    )
+    assert updated is not None
+    assert updated.name == "Updated daily"
+    assert updated.interval_minutes == 60
+
+    result = await service.run_now(monitor.id)
+    assert result is not None
+    _, manual_job = result
+    assert manual_job.id == "job-1"
+
+
+async def test_running_job_can_be_cancelled(tmp_path) -> None:
+    class BlockingAuditService:
+        async def run(self, request: AuditRequest) -> AuditReport:
+            await asyncio.Event().wait()
+            raise AssertionError("unreachable")
+
+    repository = AuditRepository(str(tmp_path / "cancel.db"))
+    await repository.initialize()
+    tasks: set[asyncio.Task[None]] = set()
+    jobs = AuditJobService(BlockingAuditService(), repository, tasks)
+
+    job = await jobs.submit(AuditRequest(url="https://example.test"))
+    await asyncio.sleep(0)
+    cancelled = await jobs.cancel(job.id)
+
+    assert cancelled is not None
+    assert cancelled.status == AuditJobStatus.CANCELLED
+    assert (await repository.get_job(job.id)).status == AuditJobStatus.CANCELLED

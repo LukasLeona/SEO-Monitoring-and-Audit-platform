@@ -27,8 +27,9 @@ sitemaps must remain on the root origin. Crawl delays force single-page batches.
 
 ## Storage
 
-SQLite uses one connection per operation and WAL mode. Reports, jobs, and
-monitors are stored as version-tolerant JSON alongside indexed fields used for
+SQLite uses one connection per operation, WAL mode, a busy timeout, schema
+migration tracking, and indexes for history, queue, and due-monitor reads.
+Reports, jobs, and monitors are stored as version-tolerant JSON alongside indexed fields used for
 sorting and due-work queries. This keeps the first deployment simple; a
 distributed deployment should replace SQLite and the in-process scheduler with
 a shared database and worker queue.

@@ -23,3 +23,8 @@ async def test_repository_round_trip(tmp_path) -> None:
 
     assert await repository.get("audit-1") == report
     assert (await repository.list())[0].id == "audit-1"
+    assert (await repository.list(min_score=100))[0].id == "audit-1"
+    assert await repository.list(max_score=99) == []
+    stats = await repository.stats()
+    assert stats.schema_version == 1
+    assert stats.audits_total == 1

@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.responses import Response
 
+from seo_monitor import __version__
 from seo_monitor.api_security import configure_api_security
 from seo_monitor.comparison import compare_audits
 from seo_monitor.config import Settings, get_settings
@@ -70,7 +71,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(
         title=app_settings.app_name,
-        version="0.1.0",
+        version=__version__,
         lifespan=lifespan,
     )
     configure_api_security(app, app_settings)

@@ -1,6 +1,6 @@
 [project]
 name = "seo-monitoring-platform"
-version = "0.1.0"
+version = "0.2.0"
 description = "API-first SEO monitoring and audit platform"
 readme = "README.md"
 requires-python = ">=3.12"

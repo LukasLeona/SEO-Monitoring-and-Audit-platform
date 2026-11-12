@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import json
 
 import uvicorn
 
@@ -9,14 +10,43 @@ from seo_monitor.repository import AuditRepository
 from seo_monitor.service import AuditService
 
 
-async def _audit(url: str, max_pages: int, use_browser: bool) -> None:
+async def _audit(args: argparse.Namespace) -> None:
     settings = get_settings()
     repository = AuditRepository(settings.database_path)
     await repository.initialize()
     report = await AuditService(settings, repository).run(
-        AuditRequest(url=url, max_pages=max_pages, use_browser=use_browser)
+        AuditRequest(
+            url=args.url,
+            max_pages=args.max_pages,
+            max_depth=args.max_depth,
+            include_paths=args.include_path,
+            exclude_paths=args.exclude_path,
+            use_browser=args.browser,
+            respect_robots=not args.ignore_robots,
+            use_sitemap=not args.ignore_sitemap,
+        )
     )
     print(report.model_dump_json(indent=2))
+
+
+async def _history(limit: int) -> None:
+    settings = get_settings()
+    repository = AuditRepository(settings.database_path)
+    await repository.initialize()
+    summaries = await repository.list(limit=limit)
+    print(
+        json.dumps(
+            [summary.model_dump(mode="json") for summary in summaries],
+            indent=2,
+        )
+    )
+
+
+async def _stats() -> None:
+    settings = get_settings()
+    repository = AuditRepository(settings.database_path)
+    await repository.initialize()
+    print((await repository.stats()).model_dump_json(indent=2))
 
 
 def main() -> None:
@@ -30,13 +60,27 @@ def main() -> None:
     audit = subcommands.add_parser("audit", help="audit a website")
     audit.add_argument("url")
     audit.add_argument("--max-pages", default=1, type=int)
+    audit.add_argument("--max-depth", default=5, type=int)
+    audit.add_argument("--include-path", action="append", default=[])
+    audit.add_argument("--exclude-path", action="append", default=[])
     audit.add_argument("--browser", action="store_true")
+    audit.add_argument("--ignore-robots", action="store_true")
+    audit.add_argument("--ignore-sitemap", action="store_true")
+
+    history = subcommands.add_parser("history", help="list recent audit reports")
+    history.add_argument("--limit", default=20, type=int)
+
+    subcommands.add_parser("stats", help="show stored audit and monitor counts")
 
     args = parser.parse_args()
     if args.command == "serve":
         uvicorn.run("seo_monitor.api:app", host=args.host, port=args.port)
+    elif args.command == "audit":
+        asyncio.run(_audit(args))
+    elif args.command == "history":
+        asyncio.run(_history(args.limit))
     else:
-        asyncio.run(_audit(args.url, args.max_pages, args.browser))
+        asyncio.run(_stats())
 
 
 if __name__ == "__main__":
