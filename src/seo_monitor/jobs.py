@@ -20,6 +20,7 @@ class AuditJobService:
         self.repository = repository
         self.tasks = tasks
         self.notifier = notifier
+        self._tasks_by_job: dict[str, asyncio.Task[None]] = {}
 
     async def submit(self, request: AuditRequest) -> AuditJob:
         job = AuditJob(
@@ -30,8 +31,40 @@ class AuditJobService:
         await self.repository.save_job(job)
         task = asyncio.create_task(self._run(job), name=f"audit-job-{job.id}")
         self.tasks.add(task)
-        task.add_done_callback(self.tasks.discard)
+        self._tasks_by_job[job.id] = task
+        task.add_done_callback(
+            lambda completed, job_id=job.id: self._forget_task(job_id, completed)
+        )
         return job
+
+    def _forget_task(self, job_id: str, task: asyncio.Task[None]) -> None:
+        self.tasks.discard(task)
+        self._tasks_by_job.pop(job_id, None)
+
+    async def cancel(self, job_id: str) -> AuditJob | None:
+        job = await self.repository.get_job(job_id)
+        if job is None:
+            return None
+        if job.status in {
+            AuditJobStatus.COMPLETED,
+            AuditJobStatus.FAILED,
+            AuditJobStatus.CANCELLED,
+        }:
+            return job
+
+        task = self._tasks_by_job.get(job_id)
+        if task and not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
+        cancelled = job.model_copy(
+            update={
+                "status": AuditJobStatus.CANCELLED,
+                "updated_at": datetime.now(UTC),
+            }
+        )
+        await self.repository.save_job(cancelled)
+        return cancelled
 
     async def _run(self, job: AuditJob) -> None:
         running = job.model_copy(

@@ -117,6 +117,7 @@ class AuditJobStatus(StrEnum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class AuditJob(BaseModel):

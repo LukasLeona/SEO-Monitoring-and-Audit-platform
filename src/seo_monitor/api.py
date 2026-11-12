@@ -133,6 +133,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return job
 
     @app.post(
+        "/api/v1/jobs/{job_id}/cancel",
+        response_model=AuditJob,
+        tags=["jobs"],
+    )
+    async def cancel_audit_job(
+        job_id: str,
+        jobs: AuditJobService = Depends(audit_job_service),
+    ) -> AuditJob:
+        job = await jobs.cancel(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Audit job not found")
+        return job
+
+    @app.post(
         "/api/v1/monitors",
         response_model=Monitor,
         status_code=status.HTTP_201_CREATED,
