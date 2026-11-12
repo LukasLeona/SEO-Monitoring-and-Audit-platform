@@ -21,6 +21,7 @@ ISSUE_REMEDIATIONS: dict[str, str] = {
     ),
     "h1.missing": "Add one clear H1 that describes the primary page topic.",
     "h1.multiple": "Keep one primary H1 and move subsections to lower heading levels.",
+    "heading.skipped_level": "Use sequential heading levels so the document outline is clear.",
     "canonical.missing": "Add a self-referencing or intentionally selected canonical URL.",
     "html.lang_missing": "Set the html lang attribute to the page's primary language.",
     "robots.noindex": "Remove noindex when the page should be eligible for search results.",
@@ -28,6 +29,7 @@ ISSUE_REMEDIATIONS: dict[str, str] = {
     "social.open_graph_missing": "Add Open Graph title, description, image, and URL metadata.",
     "social.twitter_card_missing": "Add a Twitter card type and supporting social metadata.",
     "image.alt_missing": "Add meaningful alt text, or an empty alt value for decorative images.",
+    "link.empty_text": "Give links descriptive visible text or an accessible label.",
     "content.thin": "Add original, useful content that fully answers the page's search intent.",
     "structured_data.invalid_json": "Validate and correct the JSON-LD syntax before deployment.",
     "robots.disallowed": "Review the robots.txt rule if this page should be crawlable.",
@@ -80,6 +82,7 @@ class PageAudit(BaseModel):
     word_count: int = 0
     internal_links: int = 0
     external_links: int = 0
+    empty_links: int = 0
     images: int = 0
     images_without_alt: int = 0
     score: int = Field(default=100, ge=0, le=100)

@@ -46,6 +46,7 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
     h1 = [_text(tag.get_text(" ", strip=True)) for tag in soup.find_all("h1")]
     h1 = [value for value in h1 if value]
     headings = [tag.name for tag in soup.find_all(re.compile(r"^h[1-6]$"))]
+    heading_levels = [int(heading[1]) for heading in headings]
 
     canonical_tag = soup.find("link", attrs={"rel": lambda rel: rel and "canonical" in rel})
     canonical = None
@@ -137,6 +138,20 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
             )
         )
 
+    for previous, current in zip(heading_levels, heading_levels[1:], strict=False):
+        if current > previous + 1:
+            issues.append(
+                _issue(
+                    "heading.skipped_level",
+                    "content",
+                    Severity.WARNING,
+                    "Heading hierarchy skips one or more levels",
+                    from_level=previous,
+                    to_level=current,
+                )
+            )
+            break
+
     if not canonical:
         issues.append(
             _issue("canonical.missing", "indexability", Severity.INFO, "Page has no canonical link")
@@ -215,7 +230,18 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
     discovered_links: list[str] = []
     internal_links = 0
     external_links = 0
+    empty_links = 0
     for anchor in soup.find_all("a", href=True):
+        accessible_name = (
+            anchor.get_text(" ", strip=True)
+            or anchor.get("aria-label")
+            or next(
+                (image.get("alt") for image in anchor.find_all("img") if image.get("alt")),
+                None,
+            )
+        )
+        if not accessible_name:
+            empty_links += 1
         resolved = resolve_link(page.final_url, str(anchor["href"]))
         if not resolved:
             continue
@@ -224,6 +250,17 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
             discovered_links.append(resolved)
         else:
             external_links += 1
+
+    if empty_links:
+        issues.append(
+            _issue(
+                "link.empty_text",
+                "accessibility",
+                Severity.WARNING,
+                "Some links have no descriptive text or accessible label",
+                count=empty_links,
+            )
+        )
 
     structured_data_types: list[str] = []
     for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
@@ -278,6 +315,7 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
         word_count=word_count,
         internal_links=internal_links,
         external_links=external_links,
+        empty_links=empty_links,
         images=len(images),
         images_without_alt=images_without_alt,
         duration_ms=page.duration_ms,
