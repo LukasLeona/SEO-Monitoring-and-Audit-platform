@@ -247,6 +247,36 @@ class AuditRepository:
             report.id,
         )
 
+    def _history_for_root_sync(
+        self,
+        root_url: str,
+        limit: int,
+    ) -> list[AuditReport]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT report_json
+                FROM audits
+                WHERE root_url = ?
+                ORDER BY started_at DESC
+                LIMIT ?
+                """,
+                (root_url, limit),
+            ).fetchall()
+        reports = [AuditReport.model_validate_json(row["report_json"]) for row in rows]
+        return list(reversed(reports))
+
+    async def history_for_root(
+        self,
+        root_url: str,
+        limit: int = 30,
+    ) -> list[AuditReport]:
+        return await asyncio.to_thread(
+            self._history_for_root_sync,
+            root_url,
+            limit,
+        )
+
     def _save_job_sync(self, job: AuditJob) -> None:
         with self._connect() as connection:
             connection.execute(

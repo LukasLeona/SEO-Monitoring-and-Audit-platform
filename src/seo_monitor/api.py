@@ -22,6 +22,7 @@ from seo_monitor.models import (
     AuditReport,
     AuditRequest,
     AuditSummary,
+    AuditTrend,
     GSCQuery,
     GSCResponse,
     Monitor,
@@ -35,6 +36,7 @@ from seo_monitor.observability import add_request_tracing, configure_logging
 from seo_monitor.repository import AuditRepository
 from seo_monitor.service import AuditService
 from seo_monitor.sitemap_coverage import build_sitemap_coverage
+from seo_monitor.trends import build_trend
 from seo_monitor.webhook import WebhookNotifier
 
 
@@ -252,6 +254,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             min_score,
             max_score,
         )
+
+    @app.get("/api/v1/trends", response_model=AuditTrend, tags=["audits"])
+    async def audit_trend(
+        root_url: str,
+        limit: int = Query(default=30, ge=2, le=365),
+        repo: AuditRepository = Depends(audit_repository),
+    ) -> AuditTrend:
+        reports = await repo.history_for_root(root_url, limit)
+        return build_trend(root_url, reports)
 
     @app.get("/api/v1/audits/{audit_id}", response_model=AuditReport, tags=["audits"])
     async def get_audit(

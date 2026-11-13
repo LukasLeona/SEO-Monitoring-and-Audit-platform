@@ -249,6 +249,19 @@ class SitemapCoverage(BaseModel):
     pages: list[SitemapPageStatus]
 
 
+class AuditTrendPoint(BaseModel):
+    audit_id: str
+    completed_at: datetime
+    score: int
+    pages_scanned: int
+    issue_summary: dict[Severity, int]
+
+
+class AuditTrend(BaseModel):
+    root_url: str
+    points: list[AuditTrendPoint]
+
+
 class SystemStats(BaseModel):
     schema_version: int
     audits_total: int
