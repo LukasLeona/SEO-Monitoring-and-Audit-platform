@@ -86,6 +86,19 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
             )
         )
 
+    redirect_count = max(0, len(page.redirect_chain) - 1)
+    if redirect_count >= 3:
+        issues.append(
+            _issue(
+                "redirect.long_chain",
+                "crawlability",
+                Severity.WARNING,
+                "Page required three or more redirects",
+                redirects=redirect_count,
+                chain=page.redirect_chain,
+            )
+        )
+
     if page.content_type and "html" not in page.content_type.lower():
         issues.append(
             _issue(
@@ -365,6 +378,8 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
         url=page.requested_url,
         final_url=page.final_url,
         status_code=page.status_code,
+        redirect_chain=page.redirect_chain,
+        redirect_count=redirect_count,
         content_type=page.content_type,
         title=title,
         meta_description=description,

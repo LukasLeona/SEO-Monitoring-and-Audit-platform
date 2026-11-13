@@ -12,6 +12,7 @@ ISSUE_REMEDIATIONS: dict[str, str] = {
         "Fix the URL, redirect it to a relevant page, or restore the missing resource."
     ),
     "content.non_html": "Serve indexable pages with an HTML content type.",
+    "redirect.long_chain": "Replace multi-hop redirects with one direct redirect.",
     "title.missing": "Add a unique, descriptive title element to the page head.",
     "title.short": "Expand the title with specific topic or intent terms without adding filler.",
     "title.long": "Shorten the title so its most useful terms are likely to remain visible.",
@@ -73,6 +74,8 @@ class PageAudit(BaseModel):
     url: str
     final_url: str
     status_code: int
+    redirect_chain: list[str] = Field(default_factory=list)
+    redirect_count: int = 0
     crawl_depth: int = 0
     discovered_from: str | None = None
     content_type: str | None = None

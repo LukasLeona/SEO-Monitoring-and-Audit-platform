@@ -81,6 +81,9 @@ class BrowserFetcher:
                 headers=headers,
                 html=html,
                 duration_ms=round((perf_counter() - started) * 1000),
+                redirect_chain=(
+                    [requested_url, final_url] if requested_url != final_url else [requested_url]
+                ),
             )
         except FetchError:
             raise

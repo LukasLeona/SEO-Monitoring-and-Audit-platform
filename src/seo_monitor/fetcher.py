@@ -1,5 +1,5 @@
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from time import perf_counter
 from urllib.parse import urljoin
 
@@ -21,6 +21,7 @@ class FetchedPage:
     headers: dict[str, str]
     html: str
     duration_ms: int
+    redirect_chain: list[str] = field(default_factory=list)
 
     @property
     def content_type(self) -> str | None:
@@ -37,6 +38,7 @@ class HTTPFetcher:
             allow_private_hosts=self.settings.allow_private_hosts,
         )
         current_url = requested_url
+        redirect_chain = [requested_url]
         started = perf_counter()
 
         timeout = httpx.Timeout(self.settings.request_timeout_seconds)
@@ -69,6 +71,7 @@ class HTTPFetcher:
                                     urljoin(current_url, location),
                                     allow_private_hosts=self.settings.allow_private_hosts,
                                 )
+                                redirect_chain.append(current_url)
                                 redirected = True
                                 break
 
@@ -89,6 +92,7 @@ class HTTPFetcher:
                                 },
                                 html=html,
                                 duration_ms=round((perf_counter() - started) * 1000),
+                                redirect_chain=redirect_chain,
                             )
                     except httpx.HTTPError as exc:
                         if attempt >= self.settings.max_retries:
