@@ -1,10 +1,12 @@
 import argparse
 import asyncio
 import json
+from pathlib import Path
 
 import uvicorn
 
 from seo_monitor.config import get_settings
+from seo_monitor.exporter import audit_to_csv, audit_to_jsonl
 from seo_monitor.models import AuditRequest
 from seo_monitor.repository import AuditRepository
 from seo_monitor.service import AuditService
@@ -49,6 +51,27 @@ async def _stats() -> None:
     print((await repository.stats()).model_dump_json(indent=2))
 
 
+def _write_export(path: str, content: str) -> Path:
+    output_path = Path(path)
+    output_path.write_text(content, encoding="utf-8", newline="")
+    return output_path.resolve()
+
+
+async def _export(args: argparse.Namespace) -> None:
+    settings = get_settings()
+    repository = AuditRepository(settings.database_path)
+    await repository.initialize()
+    report = await repository.get(args.audit_id)
+    if report is None:
+        raise SystemExit(f"Audit not found: {args.audit_id}")
+
+    content = audit_to_csv(report) if args.format == "csv" else audit_to_jsonl(report)
+    if args.output:
+        print(await asyncio.to_thread(_write_export, args.output, content))
+    else:
+        print(content, end="")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="SEO monitoring and audit platform")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -72,6 +95,11 @@ def main() -> None:
 
     subcommands.add_parser("stats", help="show stored audit and monitor counts")
 
+    export = subcommands.add_parser("export", help="export a stored audit report")
+    export.add_argument("audit_id")
+    export.add_argument("--format", choices=("csv", "jsonl"), default="jsonl")
+    export.add_argument("--output", help="write the export to this file")
+
     args = parser.parse_args()
     if args.command == "serve":
         uvicorn.run("seo_monitor.api:app", host=args.host, port=args.port)
@@ -79,8 +107,10 @@ def main() -> None:
         asyncio.run(_audit(args))
     elif args.command == "history":
         asyncio.run(_history(args.limit))
-    else:
+    elif args.command == "stats":
         asyncio.run(_stats())
+    else:
+        asyncio.run(_export(args))
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 from collections import Counter
 
 from seo_monitor.models import AuditReport, Severity
@@ -48,3 +49,21 @@ def audit_to_csv(report: AuditReport) -> str:
         )
 
     return output.getvalue()
+
+
+def audit_to_jsonl(report: AuditReport) -> str:
+    """Serialize page-level audit results as newline-delimited JSON."""
+    rows = []
+    for page in report.pages:
+        rows.append(
+            json.dumps(
+                {
+                    "audit_id": report.id,
+                    "root_url": report.root_url,
+                    **page.model_dump(mode="json"),
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+        )
+    return "\n".join(rows) + ("\n" if rows else "")

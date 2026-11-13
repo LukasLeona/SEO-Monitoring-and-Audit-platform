@@ -10,7 +10,7 @@ from seo_monitor import __version__
 from seo_monitor.api_security import configure_api_security
 from seo_monitor.comparison import compare_audits
 from seo_monitor.config import Settings, get_settings
-from seo_monitor.exporter import audit_to_csv
+from seo_monitor.exporter import audit_to_csv, audit_to_jsonl
 from seo_monitor.gsc import GSCClient, GSCError
 from seo_monitor.insights import build_insights
 from seo_monitor.jobs import AuditJobService
@@ -363,6 +363,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             content=audit_to_csv(report),
             media_type="text/csv",
             headers={"Content-Disposition": f'attachment; filename="seo-audit-{report.id}.csv"'},
+        )
+
+    @app.get(
+        "/api/v1/audits/{audit_id}/export.jsonl",
+        response_class=Response,
+        tags=["audits"],
+    )
+    async def export_audit_jsonl(
+        audit_id: str,
+        repo: AuditRepository = Depends(audit_repository),
+    ) -> Response:
+        report = await repo.get(audit_id)
+        if report is None:
+            raise HTTPException(status_code=404, detail="Audit not found")
+        return Response(
+            content=audit_to_jsonl(report),
+            media_type="application/x-ndjson",
+            headers={"Content-Disposition": f'attachment; filename="seo-audit-{report.id}.jsonl"'},
         )
 
     @app.post("/api/v1/gsc/query", response_model=GSCResponse, tags=["search-console"])
