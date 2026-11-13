@@ -99,6 +99,38 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
             )
         )
 
+    is_https = page.final_url.startswith("https://")
+    x_robots_tag = page.headers.get("x-robots-tag")
+    if not is_https:
+        issues.append(
+            _issue(
+                "transport.http",
+                "security",
+                Severity.WARNING,
+                "Page is served over unencrypted HTTP",
+            )
+        )
+    if x_robots_tag and "noindex" in x_robots_tag.lower():
+        issues.append(
+            _issue(
+                "robots.header_noindex",
+                "indexability",
+                Severity.WARNING,
+                "Response header asks search engines not to index the page",
+                value=x_robots_tag,
+            )
+        )
+    if page.duration_ms >= 3000:
+        issues.append(
+            _issue(
+                "performance.slow_response",
+                "performance",
+                Severity.WARNING,
+                "Initial HTML response took at least three seconds",
+                duration_ms=page.duration_ms,
+            )
+        )
+
     if page.content_type and "html" not in page.content_type.lower():
         issues.append(
             _issue(
@@ -381,6 +413,9 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
         redirect_chain=page.redirect_chain,
         redirect_count=redirect_count,
         content_type=page.content_type,
+        is_https=is_https,
+        x_robots_tag=x_robots_tag,
+        has_hsts="strict-transport-security" in page.headers,
         title=title,
         meta_description=description,
         h1=h1,

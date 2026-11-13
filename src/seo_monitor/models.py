@@ -13,6 +13,9 @@ ISSUE_REMEDIATIONS: dict[str, str] = {
     ),
     "content.non_html": "Serve indexable pages with an HTML content type.",
     "redirect.long_chain": "Replace multi-hop redirects with one direct redirect.",
+    "transport.http": "Serve the page and all canonical URLs over HTTPS.",
+    "robots.header_noindex": "Remove the X-Robots-Tag noindex directive when unintended.",
+    "performance.slow_response": "Reduce server work, network latency, or upstream delays.",
     "title.missing": "Add a unique, descriptive title element to the page head.",
     "title.short": "Expand the title with specific topic or intent terms without adding filler.",
     "title.long": "Shorten the title so its most useful terms are likely to remain visible.",
@@ -79,6 +82,9 @@ class PageAudit(BaseModel):
     crawl_depth: int = 0
     discovered_from: str | None = None
     content_type: str | None = None
+    is_https: bool = False
+    x_robots_tag: str | None = None
+    has_hsts: bool = False
     title: str | None = None
     meta_description: str | None = None
     h1: list[str] = Field(default_factory=list)
