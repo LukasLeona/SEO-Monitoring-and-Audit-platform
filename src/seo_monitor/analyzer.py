@@ -431,6 +431,7 @@ def analyze_page(page: FetchedPage) -> AnalysisResult:
         word_count=word_count,
         content_hash=content_hash,
         internal_links=internal_links,
+        internal_link_targets=list(dict.fromkeys(discovered_links)),
         external_links=external_links,
         empty_links=empty_links,
         images=len(images),

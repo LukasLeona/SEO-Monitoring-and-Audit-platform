@@ -39,6 +39,7 @@ ISSUE_REMEDIATIONS: dict[str, str] = {
     "social.twitter_card_missing": "Add a Twitter card type and supporting social metadata.",
     "image.alt_missing": "Add meaningful alt text, or an empty alt value for decorative images.",
     "link.empty_text": "Give links descriptive visible text or an accessible label.",
+    "link.broken_internal": "Repair, remove, or redirect internal links returning an error.",
     "content.thin": "Add original, useful content that fully answers the page's search intent.",
     "structured_data.invalid_json": "Validate and correct the JSON-LD syntax before deployment.",
     "robots.disallowed": "Review the robots.txt rule if this page should be crawlable.",
@@ -100,6 +101,7 @@ class PageAudit(BaseModel):
     word_count: int = 0
     content_hash: str | None = None
     internal_links: int = 0
+    internal_link_targets: list[str] = Field(default_factory=list)
     external_links: int = 0
     empty_links: int = 0
     images: int = 0

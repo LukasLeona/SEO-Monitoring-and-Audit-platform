@@ -53,4 +53,21 @@ def apply_sitewide_checks(pages: list[PageAudit]) -> list[PageAudit]:
         code="sitewide.duplicate_content",
         message="Multiple pages contain substantially identical visible content",
     )
+    pages_by_url = {page.final_url: page for page in pages}
+    for page in pages:
+        broken_targets = sorted(
+            target
+            for target in page.internal_link_targets
+            if target in pages_by_url and pages_by_url[target].status_code >= 400
+        )
+        if broken_targets:
+            page.issues.append(
+                AuditIssue(
+                    code="link.broken_internal",
+                    category="links",
+                    severity=Severity.ERROR,
+                    message="Page links to an internal URL returning an error",
+                    evidence={"targets": broken_targets},
+                )
+            )
     return [score_page(page) for page in pages]
