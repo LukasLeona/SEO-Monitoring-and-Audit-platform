@@ -3,7 +3,7 @@ from datetime import date
 from seo_monitor import gsc
 from seo_monitor.config import Settings
 from seo_monitor.gsc import GSCClient
-from seo_monitor.models import GSCFilter, GSCQuery
+from seo_monitor.models import GSCFilter, GSCQuery, URLInspectionRequest
 
 
 def test_gsc_query_builds_advanced_payload(monkeypatch) -> None:
@@ -53,3 +53,43 @@ def test_gsc_query_builds_advanced_payload(monkeypatch) -> None:
         "expression": "seo",
     }
     assert result.response_aggregation_type == "byPage"
+
+
+def test_gsc_url_inspection_builds_request(monkeypatch) -> None:
+    captured = {}
+
+    class Request:
+        def execute(self):
+            return {"inspectionResult": {"indexStatusResult": {"verdict": "PASS"}}}
+
+    class Index:
+        def inspect(self, *, body):
+            captured["body"] = body
+            return Request()
+
+    class URLInspection:
+        def index(self):
+            return Index()
+
+    class Service:
+        def urlInspection(self):
+            return URLInspection()
+
+    monkeypatch.setattr(gsc, "build", lambda *args, **kwargs: Service())
+    client = GSCClient(Settings())
+    monkeypatch.setattr(client, "_credentials", lambda: object())
+
+    result = client._inspect_sync(
+        URLInspectionRequest(
+            inspection_url="https://example.com/article",
+            site_url="sc-domain:example.com",
+            language_code="en-US",
+        )
+    )
+
+    assert captured["body"] == {
+        "inspectionUrl": "https://example.com/article",
+        "siteUrl": "sc-domain:example.com",
+        "languageCode": "en-US",
+    }
+    assert result.inspection_result["indexStatusResult"]["verdict"] == "PASS"

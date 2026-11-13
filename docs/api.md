@@ -15,6 +15,10 @@ When `SEO_API_KEY` is configured, every `/api/v1` request must include
 - `GET /api/v1/audits/{audit_id}/insights` returns prioritized actions.
 - `GET /api/v1/audits/{audit_id}/compare` compares with the prior matching audit.
 - `GET /api/v1/audits/{audit_id}/export.csv` downloads spreadsheet-ready rows.
+- `GET /api/v1/audits/{audit_id}/export.jsonl` streams ingestion-ready page rows.
+- `GET /api/v1/audits/{audit_id}/sitemap-coverage` summarizes sampled sitemap URLs.
+- `GET /api/v1/audits/trends` returns time-ordered score and issue history.
+- `POST /api/v1/audits/retention` previews or deletes reports older than a cutoff.
 
 Issue objects include a stable code, severity, category, evidence, and a
 `remediation` field suitable for task creation.
@@ -46,4 +50,6 @@ successful audit.
 
 Search Console requests support `filters`, `search_type`, `aggregation_type`,
 `data_state`, `start_row`, and `row_limit`.
+`POST /api/v1/gsc/inspect` exposes the Search Console URL Inspection operation
+for a URL inside a verified URL-prefix or domain property.
 

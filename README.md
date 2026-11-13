@@ -11,12 +11,14 @@ history, renders JavaScript when needed, and queries Google Search Console.
 - Beautiful Soup checks for metadata, headings, canonicals, indexability,
   image alt text, mobile/social tags, thin content, and JSON-LD
 - robots.txt enforcement, crawl-delay support, and XML sitemap discovery
-- sitewide duplicate title, description, and visible-content detection
+- redirect-chain, transport-security, response-header, and latency checks
+- sitewide duplicate, broken-link, inbound-link, and orphan-page detection
 - weighted page and site scores
 - optional Playwright rendering for JavaScript-heavy sites
-- advanced Google Search Console queries with filters and pagination
+- advanced Google Search Console queries and URL Inspection
 - SQLite audit history
-- searchable history, cancellable jobs, editable monitors, and CSV exports
+- audit trends, sitemap coverage, retention controls, and CSV/JSONL exports
+- durable jobs with cancellation and interrupted-job recovery
 - readiness checks and Prometheus-compatible operational metrics
 - JSON request logs with request IDs and processing-time headers
 - optional API-key authentication, CORS allowlists, and hardened response headers
@@ -57,7 +59,12 @@ curl -X POST http://127.0.0.1:8000/api/v1/monitors \
 
 Compare an audit with the previous audit for the same root URL through
 `GET /api/v1/audits/{audit_id}/compare`, or supply `baseline_id` explicitly.
-Download page-level results from `GET /api/v1/audits/{audit_id}/export.csv`.
+Download page-level results from `GET /api/v1/audits/{audit_id}/export.csv` or
+`GET /api/v1/audits/{audit_id}/export.jsonl`. Use
+`GET /api/v1/audits/trends?root_url=https://example.com/` for historical score
+and issue trends, and `GET /api/v1/audits/{audit_id}/sitemap-coverage` to review
+the sampled sitemap URLs. Retention cleanup is available through
+`POST /api/v1/audits/retention`; it defaults to a safe dry run.
 Use `GET /api/v1/audits/{audit_id}/insights` for the prioritized issue list,
 affected URLs, audit grade, indexable-page count, and slowest pages.
 
@@ -75,6 +82,7 @@ uv run seo-monitor audit https://example.com --max-pages 20 --max-depth 3 \
   --include-path "/blog/*" --exclude-path "/blog/drafts/*"
 uv run seo-monitor history --limit 10
 uv run seo-monitor stats
+uv run seo-monitor export AUDIT_ID --format jsonl --output audit.jsonl
 ```
 
 ## Google Search Console
@@ -88,6 +96,9 @@ curl -X POST http://127.0.0.1:8000/api/v1/gsc/query \
   -H "Content-Type: application/json" \
   -d '{"site_url":"https://example.com/","start_date":"2026-10-01","end_date":"2026-10-31","dimensions":["date"],"search_type":"web","data_state":"final","filters":[{"dimension":"query","operator":"contains","expression":"seo"}],"row_limit":1000}'
 ```
+
+Inspect the indexed status of one URL with `POST /api/v1/gsc/inspect` and a
+body containing `inspection_url`, `site_url`, and an optional `language_code`.
 
 ## Configuration
 
