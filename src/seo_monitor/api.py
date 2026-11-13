@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime, timedelta
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.responses import Response
@@ -28,6 +29,8 @@ from seo_monitor.models import (
     Monitor,
     MonitorCreate,
     MonitorUpdate,
+    RetentionRequest,
+    RetentionResult,
     SitemapCoverage,
     SystemStats,
 )
@@ -125,6 +128,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return Response(
             render_metrics(await repo.stats()),
             media_type="text/plain; version=0.0.4",
+        )
+
+    @app.post(
+        "/api/v1/system/retention",
+        response_model=RetentionResult,
+        tags=["system"],
+    )
+    async def apply_retention(
+        payload: RetentionRequest,
+        repo: AuditRepository = Depends(audit_repository),
+    ) -> RetentionResult:
+        cutoff = datetime.now(UTC) - timedelta(days=payload.older_than_days)
+        matched, deleted = await repo.prune_audits(
+            cutoff,
+            dry_run=payload.dry_run,
+        )
+        return RetentionResult(
+            cutoff=cutoff,
+            matched=matched,
+            deleted=deleted,
+            dry_run=payload.dry_run,
         )
 
     @app.post(

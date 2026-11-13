@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 
 from seo_monitor.models import (
@@ -275,6 +276,33 @@ class AuditRepository:
             self._history_for_root_sync,
             root_url,
             limit,
+        )
+
+    def _prune_audits_sync(self, cutoff: str, dry_run: bool) -> tuple[int, int]:
+        with self._connect() as connection:
+            matched = connection.execute(
+                "SELECT COUNT(*) AS count FROM audits WHERE completed_at < ?",
+                (cutoff,),
+            ).fetchone()["count"]
+            deleted = 0
+            if not dry_run and matched:
+                cursor = connection.execute(
+                    "DELETE FROM audits WHERE completed_at < ?",
+                    (cutoff,),
+                )
+                deleted = cursor.rowcount
+        return matched, deleted
+
+    async def prune_audits(
+        self,
+        cutoff: datetime,
+        *,
+        dry_run: bool = True,
+    ) -> tuple[int, int]:
+        return await asyncio.to_thread(
+            self._prune_audits_sync,
+            cutoff.isoformat(),
+            dry_run,
         )
 
     def _save_job_sync(self, job: AuditJob) -> None:

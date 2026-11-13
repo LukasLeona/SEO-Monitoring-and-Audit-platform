@@ -262,6 +262,18 @@ class AuditTrend(BaseModel):
     points: list[AuditTrendPoint]
 
 
+class RetentionRequest(BaseModel):
+    older_than_days: int = Field(ge=1, le=3650)
+    dry_run: bool = True
+
+
+class RetentionResult(BaseModel):
+    cutoff: datetime
+    matched: int
+    deleted: int
+    dry_run: bool
+
+
 class SystemStats(BaseModel):
     schema_version: int
     audits_total: int
