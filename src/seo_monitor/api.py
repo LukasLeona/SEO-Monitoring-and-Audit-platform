@@ -27,12 +27,14 @@ from seo_monitor.models import (
     Monitor,
     MonitorCreate,
     MonitorUpdate,
+    SitemapCoverage,
     SystemStats,
 )
 from seo_monitor.monitoring import MonitoringService
 from seo_monitor.observability import add_request_tracing, configure_logging
 from seo_monitor.repository import AuditRepository
 from seo_monitor.service import AuditService
+from seo_monitor.sitemap_coverage import build_sitemap_coverage
 from seo_monitor.webhook import WebhookNotifier
 
 
@@ -292,6 +294,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if report is None:
             raise HTTPException(status_code=404, detail="Audit not found")
         return build_insights(report)
+
+    @app.get(
+        "/api/v1/audits/{audit_id}/sitemap-coverage",
+        response_model=SitemapCoverage,
+        tags=["audits"],
+    )
+    async def sitemap_coverage(
+        audit_id: str,
+        repo: AuditRepository = Depends(audit_repository),
+    ) -> SitemapCoverage:
+        report = await repo.get(audit_id)
+        if report is None:
+            raise HTTPException(status_code=404, detail="Audit not found")
+        return build_sitemap_coverage(report)
 
     @app.get(
         "/api/v1/audits/{audit_id}/export.csv",

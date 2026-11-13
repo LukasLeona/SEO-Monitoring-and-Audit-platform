@@ -233,6 +233,22 @@ class AuditInsights(BaseModel):
     slowest_pages: list[SlowPage]
 
 
+class SitemapPageStatus(BaseModel):
+    url: str
+    status_code: int
+    score: int
+    orphaned: bool
+
+
+class SitemapCoverage(BaseModel):
+    audit_id: str
+    sampled_urls: int
+    healthy_urls: int
+    error_urls: int
+    orphaned_urls: int
+    pages: list[SitemapPageStatus]
+
+
 class SystemStats(BaseModel):
     schema_version: int
     audits_total: int
