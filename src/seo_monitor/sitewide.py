@@ -54,7 +54,14 @@ def apply_sitewide_checks(pages: list[PageAudit]) -> list[PageAudit]:
         message="Multiple pages contain substantially identical visible content",
     )
     pages_by_url = {page.final_url: page for page in pages}
+    inbound_counts = {url: 0 for url in pages_by_url}
+    for source in pages:
+        for target in set(source.internal_link_targets):
+            if target in inbound_counts:
+                inbound_counts[target] += 1
+
     for page in pages:
+        page.inbound_internal_links = inbound_counts.get(page.final_url, 0)
         broken_targets = sorted(
             target
             for target in page.internal_link_targets
@@ -68,6 +75,20 @@ def apply_sitewide_checks(pages: list[PageAudit]) -> list[PageAudit]:
                     severity=Severity.ERROR,
                     message="Page links to an internal URL returning an error",
                     evidence={"targets": broken_targets},
+                )
+            )
+        if (
+            page.crawl_depth > 0
+            and 200 <= page.status_code < 300
+            and page.inbound_internal_links == 0
+        ):
+            page.issues.append(
+                AuditIssue(
+                    code="sitewide.orphan_page",
+                    category="sitewide",
+                    severity=Severity.WARNING,
+                    message="Page has no inbound links from other crawled pages",
+                    evidence={"discovered_from": page.discovered_from},
                 )
             )
     return [score_page(page) for page in pages]

@@ -49,6 +49,9 @@ ISSUE_REMEDIATIONS: dict[str, str] = {
     "sitewide.duplicate_content": (
         "Consolidate substantially identical pages or make each page uniquely useful."
     ),
+    "sitewide.orphan_page": (
+        "Add contextual internal links to this page from relevant crawlable pages."
+    ),
 }
 
 
@@ -102,6 +105,7 @@ class PageAudit(BaseModel):
     content_hash: str | None = None
     internal_links: int = 0
     internal_link_targets: list[str] = Field(default_factory=list)
+    inbound_internal_links: int = 0
     external_links: int = 0
     empty_links: int = 0
     images: int = 0
