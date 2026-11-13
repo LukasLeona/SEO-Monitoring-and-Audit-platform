@@ -33,6 +33,8 @@ from seo_monitor.models import (
     RetentionResult,
     SitemapCoverage,
     SystemStats,
+    URLInspectionRequest,
+    URLInspectionResponse,
 )
 from seo_monitor.monitoring import MonitoringService
 from seo_monitor.observability import add_request_tracing, configure_logging
@@ -367,6 +369,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def query_search_console(payload: GSCQuery) -> GSCResponse:
         try:
             return await GSCClient(app_settings).query(payload)
+        except GSCError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.post(
+        "/api/v1/gsc/inspect",
+        response_model=URLInspectionResponse,
+        tags=["search-console"],
+    )
+    async def inspect_search_console_url(
+        payload: URLInspectionRequest,
+    ) -> URLInspectionResponse:
+        try:
+            return await GSCClient(app_settings).inspect(payload)
         except GSCError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 

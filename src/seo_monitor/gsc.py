@@ -7,7 +7,13 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from seo_monitor.config import Settings
-from seo_monitor.models import GSCQuery, GSCResponse, GSCRow
+from seo_monitor.models import (
+    GSCQuery,
+    GSCResponse,
+    GSCRow,
+    URLInspectionRequest,
+    URLInspectionResponse,
+)
 
 GSC_READONLY_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly"
 
@@ -78,3 +84,39 @@ class GSCClient:
 
     async def query(self, query: GSCQuery) -> GSCResponse:
         return await asyncio.to_thread(self._query_sync, query)
+
+    def _inspect_sync(
+        self,
+        request: URLInspectionRequest,
+    ) -> URLInspectionResponse:
+        try:
+            service = build(
+                "searchconsole",
+                "v1",
+                credentials=self._credentials(),
+                cache_discovery=False,
+            )
+            payload = {
+                "inspectionUrl": str(request.inspection_url),
+                "siteUrl": request.site_url,
+                "languageCode": request.language_code,
+            }
+            response = service.urlInspection().index().inspect(body=payload).execute()
+        except (
+            HttpError,
+            OSError,
+            ValueError,
+            google.auth.exceptions.GoogleAuthError,
+        ) as exc:
+            raise GSCError(f"URL Inspection request failed: {exc}") from exc
+        return URLInspectionResponse(
+            inspection_url=str(request.inspection_url),
+            site_url=request.site_url,
+            inspection_result=response.get("inspectionResult", {}),
+        )
+
+    async def inspect(
+        self,
+        request: URLInspectionRequest,
+    ) -> URLInspectionResponse:
+        return await asyncio.to_thread(self._inspect_sync, request)

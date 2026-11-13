@@ -326,3 +326,15 @@ class GSCResponse(BaseModel):
     site_url: str
     rows: list[GSCRow]
     response_aggregation_type: str | None = None
+
+
+class URLInspectionRequest(BaseModel):
+    inspection_url: HttpUrl
+    site_url: str = Field(min_length=1)
+    language_code: str = Field(default="en-US", pattern=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$")
+
+
+class URLInspectionResponse(BaseModel):
+    inspection_url: str
+    site_url: str
+    inspection_result: dict[str, Any]
