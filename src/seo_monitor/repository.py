@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import sqlite3
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from seo_monitor.models import (
@@ -370,6 +370,43 @@ class AuditRepository:
             offset,
             status,
         )
+
+    def _recover_stale_jobs_sync(self) -> int:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT job_json
+                FROM audit_jobs
+                WHERE status IN (?, ?)
+                """,
+                (AuditJobStatus.QUEUED, AuditJobStatus.RUNNING),
+            ).fetchall()
+            for row in rows:
+                job = AuditJob.model_validate_json(row["job_json"])
+                recovered = job.model_copy(
+                    update={
+                        "status": AuditJobStatus.FAILED,
+                        "error": "Job interrupted by process restart",
+                        "updated_at": datetime.now(UTC),
+                    }
+                )
+                connection.execute(
+                    """
+                    UPDATE audit_jobs
+                    SET status = ?, updated_at = ?, job_json = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        recovered.status,
+                        recovered.updated_at.isoformat(),
+                        recovered.model_dump_json(),
+                        recovered.id,
+                    ),
+                )
+        return len(rows)
+
+    async def recover_stale_jobs(self) -> int:
+        return await asyncio.to_thread(self._recover_stale_jobs_sync)
 
     def _save_monitor_sync(self, monitor: Monitor) -> None:
         with self._connect() as connection:

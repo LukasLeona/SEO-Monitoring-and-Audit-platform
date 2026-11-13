@@ -52,6 +52,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await repository.initialize()
+        app.state.recovered_jobs = await repository.recover_stale_jobs()
         app.state.settings = app_settings
         app.state.repository = repository
         app.state.audit_service = AuditService(app_settings, repository)
